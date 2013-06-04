@@ -1,4 +1,3 @@
-#!./miniruby
 if defined?(Gem)
   fail "rbinstall.rb must be run with --disable-gems"
 end
