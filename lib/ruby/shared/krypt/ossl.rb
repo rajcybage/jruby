@@ -29,12 +29,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 =end
 
-if RUBY_VERSION.to_f >= 1.9
-  require 'krypt'
+require 'krypt'
 
-  module OpenSSL
-    class Error < StandardError; end 
-  end unless defined? OpenSSL
+module OpenSSL
+  class Error < StandardError; end 
+end unless defined? OpenSSL
 
-  require_relative 'ossl/pkcs5'
-end
+require_relative 'ossl/pkcs5'
