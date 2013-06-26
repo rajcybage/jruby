@@ -30,10 +30,10 @@ package org.jruby.util;
 
 import static java.lang.System.out;
 
-import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FilterInputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -66,6 +66,7 @@ import org.jruby.runtime.Helpers;
 import org.jruby.ext.rbconfig.RbConfigLibrary;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.util.cli.Options;
 import org.jruby.util.io.IOOptions;
 import org.jruby.util.io.ModeFlags;
 
@@ -795,10 +796,18 @@ public class ShellLauncher {
      */
     public static InputStream unwrapBufferedStream(InputStream filteredStream) {
         if (RubyInstanceConfig.NO_UNWRAP_PROCESS_STREAMS) return filteredStream;
-        while (filteredStream instanceof BufferedInputStream) {
+        
+        // Java 7+ uses a stream that drains the child on exit, which when
+        // unwrapped breaks because the channel gets drained prematurely.
+//        System.out.println("class is :" + filteredStream.getClass().getName());
+        if (filteredStream.getClass().getName().indexOf("ProcessPipeInputStream") != 1) {
+            return filteredStream;
+        }
+        
+        while (filteredStream instanceof FilterInputStream) {
             try {
                 filteredStream = (InputStream)
-                    FieldAccess.getProtectedFieldValue(BufferedInputStream.class,
+                    FieldAccess.getProtectedFieldValue(FilterInputStream.class,
                         "in", filteredStream);
             } catch (Exception e) {
                 break; // break out if we've dug as deep as we can
@@ -940,7 +949,7 @@ public class ShellLauncher {
             realInput = child.getInputStream();
             input = unwrapBufferedStream(realInput);
             if (input instanceof FileInputStream) {
-                inputChannel = ((FileInputStream) input).getChannel();
+//                inputChannel = ((FileInputStream) input).getChannel();
             } else {
                 inputChannel = null;
             }
@@ -1275,10 +1284,11 @@ public class ShellLauncher {
         }
         
         private void checkGlobChar(String word) {
-            if (word.contains("*")
+            if (Options.LAUNCH_INPROC.load() &&
+                    (word.contains("*")
                     || word.contains("?")
                     || word.contains("[")
-                    || word.contains("{")) {
+                    || word.contains("{"))) {
                 runtime.getErr().println("Warning: treating '" + word + "' literally."
                         + " Consider passing -J-Djruby.launch.inproc=false.");
             }

@@ -23,17 +23,16 @@
  * the provisions above, a recipient may use your version of this file under
  * the terms of any one of the EPL, the GPL or the LGPL.
  ***** END LICENSE BLOCK *****/
-package org.jruby.ext.delegate;
 
-import org.jruby.Ruby;
-import org.jruby.RubyClass;
-import org.jruby.runtime.load.Library;
+package org.jruby.internal.runtime;
 
-public class DelegateLibrary implements Library{
-    public void load(Ruby runtime, boolean wrap) {
-        RubyClass delegateClass = runtime.defineClass("Delegator", runtime.getObject(), runtime.getObject().getAllocator());
-        delegateClass.defineAnnotatedMethods(Delegator.class);
+/**
+ * Represents a Runnable that can report what Java thread it is running under.
+ */
+public interface ThreadedRunnable extends Runnable {
 
-        delegateClass.undefineMethod("==");
-    }
+    Thread getJavaThread();
+
+    void run();
+    
 }

@@ -277,7 +277,7 @@ public class RubyKernel {
         throw new RaiseException((RubyException)exc.newInstance(context, exArgs, Block.NULL_BLOCK));
     }
 
-    private static IRubyObject methodMissing(ThreadContext context, IRubyObject recv, String name, Visibility lastVis, CallType lastCallType, IRubyObject[] args, Block block) {
+    public static IRubyObject methodMissing(ThreadContext context, IRubyObject recv, String name, Visibility lastVis, CallType lastCallType, IRubyObject[] args, Block block) {
         Ruby runtime = context.runtime;
         RubySymbol symbol = runtime.newSymbol(name);
 
@@ -570,6 +570,34 @@ public class RubyKernel {
         return RubyIO.putc(context, defout, ch);
     }
 
+    @JRubyMethod(name = "puts", module = true, visibility = PRIVATE)
+    public static IRubyObject puts(ThreadContext context, IRubyObject recv) {
+        IRubyObject defout = context.runtime.getGlobalVariables().get("$>");
+
+        return RubyIO.puts0(context, defout);
+    }
+
+    @JRubyMethod(name = "puts", module = true, visibility = PRIVATE)
+    public static IRubyObject puts(ThreadContext context, IRubyObject recv, IRubyObject arg0) {
+        IRubyObject defout = context.runtime.getGlobalVariables().get("$>");
+
+        return RubyIO.puts1(context, defout, arg0);
+    }
+
+    @JRubyMethod(name = "puts", module = true, visibility = PRIVATE)
+    public static IRubyObject puts(ThreadContext context, IRubyObject recv, IRubyObject arg0, IRubyObject arg1) {
+        IRubyObject defout = context.runtime.getGlobalVariables().get("$>");
+
+        return RubyIO.puts2(context, defout, arg0, arg1);
+    }
+
+    @JRubyMethod(name = "puts", module = true, visibility = PRIVATE)
+    public static IRubyObject puts(ThreadContext context, IRubyObject recv, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2) {
+        IRubyObject defout = context.runtime.getGlobalVariables().get("$>");
+
+        return RubyIO.puts3(context, defout, arg0, arg1, arg2);
+    }
+
     @JRubyMethod(name = "puts", rest = true, module = true, visibility = PRIVATE)
     public static IRubyObject puts(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
         IRubyObject defout = context.runtime.getGlobalVariables().get("$>");
@@ -577,7 +605,7 @@ public class RubyKernel {
         return RubyIO.puts(context, defout, args);
     }
 
-    @JRubyMethod(name = "print", rest = true, module = true, visibility = PRIVATE)
+    @JRubyMethod(name = "print", rest = true, module = true, visibility = PRIVATE, reads = LASTLINE)
     public static IRubyObject print(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
         IRubyObject defout = context.runtime.getGlobalVariables().get("$>");
 
@@ -632,7 +660,7 @@ public class RubyKernel {
      * @return value of $_ as String.
      */
     private static RubyString getLastlineString(ThreadContext context, Ruby runtime) {
-        IRubyObject line = context.getCurrentScope().getLastLine(runtime);
+        IRubyObject line = context.getLastLine();
 
         if (line.isNil()) {
             throw runtime.newTypeError("$_ value need to be String (nil given).");
@@ -658,7 +686,7 @@ public class RubyKernel {
         RubyString str = (RubyString) getLastlineString(context, context.runtime).dup();
 
         if (!str.sub_bang(context, arg0, block).isNil()) {
-            context.getCurrentScope().setLastLine(str);
+            context.setLastLine(str);
         }
 
         return str;
@@ -669,7 +697,7 @@ public class RubyKernel {
         RubyString str = (RubyString) getLastlineString(context, context.runtime).dup();
 
         if (!str.sub_bang(context, arg0, arg1, block).isNil()) {
-            context.getCurrentScope().setLastLine(str);
+            context.setLastLine(str);
         }
 
         return str;
@@ -690,7 +718,7 @@ public class RubyKernel {
         RubyString str = (RubyString) getLastlineString(context, context.runtime).dup();
 
         if (!str.gsub_bang(context, arg0, block).isNil()) {
-            context.getCurrentScope().setLastLine(str);
+            context.setLastLine(str);
         }
 
         return str;
@@ -701,7 +729,7 @@ public class RubyKernel {
         RubyString str = (RubyString) getLastlineString(context, context.runtime).dup();
 
         if (!str.gsub_bang(context, arg0, arg1, block).isNil()) {
-            context.getCurrentScope().setLastLine(str);
+            context.setLastLine(str);
         }
 
         return str;
@@ -719,7 +747,7 @@ public class RubyKernel {
         if (str.getByteList().getRealSize() > 0) {
             str = (RubyString) str.dup();
             str.chop_bang(context);
-            context.getCurrentScope().setLastLine(str);
+            context.setLastLine(str);
         }
 
         return str;
@@ -744,7 +772,7 @@ public class RubyKernel {
             return str;
         } 
 
-        context.getCurrentScope().setLastLine(dup);
+        context.setLastLine(dup);
         return dup;
     }
 
@@ -757,7 +785,7 @@ public class RubyKernel {
             return str;
         } 
 
-        context.getCurrentScope().setLastLine(dup);
+        context.setLastLine(dup);
         return dup;
     }
 
@@ -2204,19 +2232,19 @@ public class RubyKernel {
         return ((RubyBasicObject)self).send(context, args, block);
     }
 
-    @JRubyMethod(name = {"send"}, compat = RUBY1_9)
+    @JRubyMethod(name = {"send"}, compat = RUBY1_9, omit = true)
     public static IRubyObject send19(ThreadContext context, IRubyObject self, IRubyObject arg0, Block block) {
         return ((RubyBasicObject)self).send19(context, arg0, block);
     }
-    @JRubyMethod(name = {"send"}, compat = RUBY1_9)
+    @JRubyMethod(name = {"send"}, compat = RUBY1_9, omit = true)
     public static IRubyObject send19(ThreadContext context, IRubyObject self, IRubyObject arg0, IRubyObject arg1, Block block) {
         return ((RubyBasicObject)self).send19(context, arg0, arg1, block);
     }
-    @JRubyMethod(name = {"send"}, compat = RUBY1_9)
+    @JRubyMethod(name = {"send"}, compat = RUBY1_9, omit = true)
     public static IRubyObject send19(ThreadContext context, IRubyObject self, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2, Block block) {
         return ((RubyBasicObject)self).send19(context, arg0, arg1, arg2, block);
     }
-    @JRubyMethod(name = {"send"}, required = 1, rest = true, compat = RUBY1_9)
+    @JRubyMethod(name = {"send"}, required = 1, rest = true, compat = RUBY1_9, omit = true)
     public static IRubyObject send19(ThreadContext context, IRubyObject self, IRubyObject[] args, Block block) {
         return ((RubyBasicObject)self).send19(context, args, block);
     }

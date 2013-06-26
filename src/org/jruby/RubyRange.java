@@ -87,11 +87,7 @@ public class RubyRange extends RubyObject {
         result.index = ClassIndex.RANGE;
         result.setReifiedClass(RubyRange.class);
 
-        result.kindOf = new RubyModule.KindOf() {
-            public boolean isKindOf(IRubyObject obj, RubyModule type) {
-                return obj instanceof RubyRange;
-            }
-        };
+        result.kindOf = new RubyModule.JavaClassKindOf(RubyRange.class);
         
         result.setMarshal(RANGE_MARSHAL);
         result.includeModule(runtime.getEnumerable());
@@ -176,6 +172,30 @@ public class RubyRange extends RubyObject {
         if (len < 0) len = 0;
 
         return new long[]{beg, len};
+    }
+
+    final long begLen0(long len){
+        long beg = RubyNumeric.num2long(this.begin);
+
+        if (beg < 0) {
+            beg += len;
+            if (beg < 0) {
+                throw getRuntime().newRangeError(beg + ".." + (isExclusive ? "." : "") + end + " out of range");
+            }
+        }
+        
+        return beg;
+    }
+
+    final long begLen1(long len, long beg){
+        long end = RubyNumeric.num2long(this.end);
+
+        if (end < 0) end += len;
+        if (!isExclusive) end++;
+        len = end - beg;
+        if (len < 0) len = 0;
+
+        return len;
     }
 
     final int[] begLenInt(int len, int err){

@@ -227,7 +227,7 @@
                     <filter token="version.ruby2_0.major" value="${version.ruby2_0.major}"/>
                     <filter token="version.ruby2_0" value="${version.ruby2_0}"/>
                     <filter token="version.ruby2_0.patchlevel" value="${version.ruby2_0.patchlevel}"/>
-                    <!--filter token="version.ruby2_0.revision" value="${version.ruby2_0.revision}"/-->
+                    <filter token="version.ruby2_0.revision" value="${version.ruby2_0.revision}"/>
                     <filter token="build.date" value="${build.date}"/>
                     <filter token="version.jruby" value="${version.jruby}"/>
                     <filter token="java.specification.version" value="${java.specification.version}"/>
@@ -277,14 +277,7 @@
             <include name="org/jruby/CompatVersion.java"/>
             <include name="org/jruby/runtime/Visibility.java"/>
             <include name="org/jruby/util/CodegenUtils.java"/>
-            <include name="org/jruby/util/log/*.java"/>
             <include name="org/jruby/util/SafePropertyAccessor.java"/>
-            <include name="org/jruby/util/cli/Options.java"/>
-            <include name="org/jruby/util/cli/Option.java"/>
-            <include name="org/jruby/util/cli/Category.java"/>
-            <include name="org/jruby/util/cli/StringOption.java"/>
-            <include name="org/jruby/util/cli/IntegerOption.java"/>
-            <include name="org/jruby/util/cli/BooleanOption.java"/>
         </javac>
     </target>
 

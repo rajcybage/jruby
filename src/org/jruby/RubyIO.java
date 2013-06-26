@@ -102,6 +102,8 @@ import org.jruby.runtime.Arity;
 
 import static org.jruby.CompatVersion.*;
 import static org.jruby.RubyEnumerator.enumeratorize;
+import org.jruby.internal.runtime.ThreadedRunnable;
+import org.jruby.internal.runtime.methods.JavaMethod;
 import org.jruby.runtime.encoding.EncodingService;
 import org.jruby.util.CharsetTranscoder;
 import org.jruby.util.ShellLauncher.POpenProcess;
@@ -267,12 +269,7 @@ public class RubyIO extends RubyObject implements IOEncodable {
         ioClass.index = ClassIndex.IO;
         ioClass.setReifiedClass(RubyIO.class);
 
-        ioClass.kindOf = new RubyModule.KindOf() {
-            @Override
-            public boolean isKindOf(IRubyObject obj, RubyModule type) {
-                return obj instanceof RubyIO;
-            }
-        };
+        ioClass.kindOf = new RubyModule.JavaClassKindOf(RubyIO.class);
 
         ioClass.includeModule(runtime.getEnumerable());
         
@@ -1650,7 +1647,7 @@ public class RubyIO extends RubyObject implements IOEncodable {
      */
     public static IRubyObject print(ThreadContext context, IRubyObject maybeIO, IRubyObject[] args) {
         if (args.length == 0) {
-            args = new IRubyObject[] { context.getCurrentScope().getLastLine(context.runtime) };
+            args = new IRubyObject[] { context.getLastLine() };
         }
 
         Ruby runtime = context.runtime;
@@ -2146,7 +2143,7 @@ public class RubyIO extends RubyObject implements IOEncodable {
         Ruby runtime = context.runtime;
         IRubyObject result = getline(runtime, separator(runtime, runtime.getRecordSeparatorVar().get()));
 
-        if (!result.isNil()) context.getCurrentScope().setLastLine(result);
+        if (!result.isNil()) context.setLastLine(result);
 
         return result;
     }
@@ -2156,7 +2153,7 @@ public class RubyIO extends RubyObject implements IOEncodable {
         Ruby runtime = context.runtime;
         IRubyObject result = getline(runtime, separator(runtime, separatorArg));
 
-        if (!result.isNil()) context.getCurrentScope().setLastLine(result);
+        if (!result.isNil()) context.setLastLine(result);
 
         return result;
     }
@@ -2166,7 +2163,7 @@ public class RubyIO extends RubyObject implements IOEncodable {
         Ruby runtime = context.runtime;
         IRubyObject result = getline(runtime, separator(runtime));
 
-        if (!result.isNil()) context.getCurrentScope().setLastLine(result);
+        if (!result.isNil()) context.setLastLine(result);
 
         return result;
     }
@@ -2186,7 +2183,7 @@ public class RubyIO extends RubyObject implements IOEncodable {
 
         IRubyObject result = getline(runtime, separator, limit);
 
-        if (!result.isNil()) context.getCurrentScope().setLastLine(result);
+        if (!result.isNil()) context.setLastLine(result);
 
         return result;
     }
@@ -2197,7 +2194,7 @@ public class RubyIO extends RubyObject implements IOEncodable {
         long limit = limit_arg.isNil() ? -1 : RubyNumeric.fix2long(TypeConverter.checkIntegerType(runtime, limit_arg, "to_int"));
         IRubyObject result = getline(runtime, separator(runtime, separator), limit);
 
-        if (!result.isNil()) context.getCurrentScope().setLastLine(result);
+        if (!result.isNil()) context.setLastLine(result);
 
         return result;
     }
@@ -2297,12 +2294,69 @@ public class RubyIO extends RubyObject implements IOEncodable {
     private static final ByteList NIL_BYTELIST = ByteList.create("nil");
     private static final ByteList RECURSIVE_BYTELIST = ByteList.create("[...]");
 
+    @JRubyMethod(name = "puts")
+    public IRubyObject puts(ThreadContext context) {
+        return puts0(context, this);
+    }
+
+    @JRubyMethod(name = "puts")
+    public IRubyObject puts(ThreadContext context, IRubyObject arg0) {
+        return puts1(context, this, arg0);
+    }
+
+    @JRubyMethod(name = "puts")
+    public IRubyObject puts(ThreadContext context, IRubyObject arg0, IRubyObject arg1) {
+        return puts2(context, this, arg0, arg1);
+    }
+
+    @JRubyMethod(name = "puts")
+    public IRubyObject puts(ThreadContext context, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2) {
+        return puts3(context, this, arg0, arg1, arg2);
+    }
+
     @JRubyMethod(name = "puts", rest = true)
     public IRubyObject puts(ThreadContext context, IRubyObject[] args) {
         return puts(context, this, args);
     }
 
-    public static IRubyObject puts(ThreadContext context, IRubyObject maybeIO, IRubyObject[] args) {
+    public static IRubyObject puts0(ThreadContext context, IRubyObject maybeIO) {
+        return writeSeparator(context, maybeIO);
+    }
+
+    public static IRubyObject puts1(ThreadContext context, IRubyObject maybeIO, IRubyObject arg0) {
+        Ruby runtime = context.runtime;
+        assert runtime.getGlobalVariables().getDefaultSeparator() instanceof RubyString;
+        RubyString separator = (RubyString) runtime.getGlobalVariables().getDefaultSeparator();
+        
+        putsSingle(context, runtime, maybeIO, arg0, separator);
+        
+        return context.nil;
+    }
+
+    public static IRubyObject puts2(ThreadContext context, IRubyObject maybeIO, IRubyObject arg0, IRubyObject arg1) {
+        Ruby runtime = context.runtime;
+        assert runtime.getGlobalVariables().getDefaultSeparator() instanceof RubyString;
+        RubyString separator = (RubyString) runtime.getGlobalVariables().getDefaultSeparator();
+        
+        putsSingle(context, runtime, maybeIO, arg0, separator);
+        putsSingle(context, runtime, maybeIO, arg1, separator);
+        
+        return context.nil;
+    }
+
+    public static IRubyObject puts3(ThreadContext context, IRubyObject maybeIO, IRubyObject arg0, IRubyObject arg1, IRubyObject arg2) {
+        Ruby runtime = context.runtime;
+        assert runtime.getGlobalVariables().getDefaultSeparator() instanceof RubyString;
+        RubyString separator = (RubyString) runtime.getGlobalVariables().getDefaultSeparator();
+        
+        putsSingle(context, runtime, maybeIO, arg0, separator);
+        putsSingle(context, runtime, maybeIO, arg1, separator);
+        putsSingle(context, runtime, maybeIO, arg2, separator);
+        
+        return context.nil;
+    }
+
+    public static IRubyObject puts(ThreadContext context, IRubyObject maybeIO, IRubyObject... args) {
         if (args.length == 0) {
             return writeSeparator(context, maybeIO);
         }
@@ -2325,26 +2379,31 @@ public class RubyIO extends RubyObject implements IOEncodable {
         RubyString separator = (RubyString) runtime.getGlobalVariables().getDefaultSeparator();
 
         for (int i = 0; i < args.length; i++) {
-            ByteList line;
-
-            if (args[i].isNil()) {
-                line = getNilByteList(runtime);
-            } else if (runtime.isInspecting(args[i])) {
-                line = RECURSIVE_BYTELIST;
-            } else if (args[i] instanceof RubyArray) {
-                inspectPuts(context, maybeIO, (RubyArray) args[i]);
-                continue;
-            } else {
-                line = args[i].asString().getByteList();
-            }
-
-            write(context, maybeIO, line);
-
-            if (line.length() == 0 || !line.endsWith(separator.getByteList())) {
-                write(context, maybeIO, separator.getByteList());
-            }
+            putsSingle(context, runtime, maybeIO, args[i], separator);
         }
+        
         return runtime.getNil();
+    }
+    
+    private static void putsSingle(ThreadContext context, Ruby runtime, IRubyObject maybeIO, IRubyObject arg, RubyString separator) {
+        ByteList line;
+
+        if (arg.isNil()) {
+            line = getNilByteList(runtime);
+        } else if (runtime.isInspecting(arg)) {
+            line = RECURSIVE_BYTELIST;
+        } else if (arg instanceof RubyArray) {
+            inspectPuts(context, maybeIO, (RubyArray) arg);
+            return;
+        } else {
+            line = arg.asString().getByteList();
+        }
+
+        write(context, maybeIO, line);
+
+        if (line.length() == 0 || !line.endsWith(separator.getByteList())) {
+            write(context, maybeIO, separator.getByteList());
+        }
     }
 
     protected void write(ThreadContext context, ByteList byteList) {
@@ -3877,11 +3936,9 @@ public class RubyIO extends RubyObject implements IOEncodable {
             // chance by waiting for 10ms before we proceed. Only doing this on 1.5
             // since Hotspot 1.6+ does not seem to exhibit the problem.
             if (System.getProperty("java.specification.version", "").equals("1.5")) {
-                synchronized (process) {
-                    try {
-                        process.wait(100);
-                    } catch (InterruptedException ie) {}
-                }
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ie) {}
             }
 
             RubyIO io = new RubyIO(runtime, process, ioOptions);
@@ -4100,7 +4157,7 @@ public class RubyIO extends RubyObject implements IOEncodable {
         }
     }
    
-    @JRubyMethod(rest = true, meta = true)
+    @JRubyMethod(rest = true, meta = true, compat = RUBY1_8)
     public static IRubyObject popen3(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
         Ruby runtime = context.runtime;
 
@@ -4125,6 +4182,80 @@ public class RubyIO extends RubyObject implements IOEncodable {
         } catch (InterruptedException e) {
             throw runtime.newThreadError("unexpected interrupt");
         }
+    }
+   
+    @JRubyMethod(name = "popen3", rest = true, meta = true, compat = RUBY1_9)
+    public static IRubyObject popen3_19(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
+        final Ruby runtime = context.runtime;
+
+        final POpenTuple tuple = popenSpecial(context, args);
+        final long pid = ShellLauncher.getPidFromProcess(tuple.process);
+
+        // array trick to be able to reference enclosing RubyThread
+        final RubyThread[] waitThread = new RubyThread[1];
+        waitThread[0] = new RubyThread(
+                runtime,
+                (RubyClass) runtime.getClassFromPath("Process::WaitThread"),
+                new ThreadedRunnable() {
+
+            volatile Thread javaThread;
+
+            @Override
+            public Thread getJavaThread() {
+                return javaThread;
+            }
+
+            @Override
+            public void run() {
+                javaThread = Thread.currentThread();
+                RubyThread rubyThread;
+                // spin a bit until this happens; should almost never spin
+                while ((rubyThread = waitThread[0]) == null) {
+                    Thread.yield();
+                }
+                
+                ThreadContext context = runtime.getThreadService().registerNewThread(rubyThread);
+
+                rubyThread.op_aset(
+                        runtime.newSymbol("pid"),
+                        runtime.newFixnum(pid));
+
+                try {
+                    int exitValue = tuple.process.waitFor();
+                    
+                    RubyProcess.RubyStatus status = RubyProcess.RubyStatus.newProcessStatus(
+                            runtime,
+                            exitValue,
+                            pid);
+                    
+                    rubyThread.cleanTerminate(status);
+                } catch (Throwable t) {
+                    rubyThread.exceptionRaised(t);
+                } finally {
+                    rubyThread.dispose();
+                }
+            }
+
+        });
+
+        RubyArray yieldArgs = RubyArray.newArrayLight(runtime,
+                tuple.output,
+                tuple.input,
+                tuple.error,
+                waitThread[0]);
+
+        if (block.isGiven()) {
+            try {
+                return block.yield(context, yieldArgs);
+            } finally {
+                cleanupPOpen(tuple);
+                
+                IRubyObject status = waitThread[0].join(IRubyObject.NULL_ARRAY);
+                context.setLastExitStatus(status);
+            }
+        }
+        
+        return yieldArgs;
     }
 
     @JRubyMethod(rest = true, meta = true)

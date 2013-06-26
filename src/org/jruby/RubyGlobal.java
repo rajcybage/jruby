@@ -144,10 +144,15 @@ public class RubyGlobal {
         runtime.defineGlobalConstant("JRUBY_VERSION", jrubyVersion);
         runtime.defineGlobalConstant("JRUBY_REVISION", jrubyRevision);
 
-        if (runtime.is1_9()) {
+        if (runtime.is2_0()) {
+            // needs to be a fixnum, but our revision is a sha1 hash from git
+            runtime.defineGlobalConstant("RUBY_REVISION", runtime.newFixnum(Constants.RUBY2_0_REVISION));
+        } else if (runtime.is1_9()) {
             // needs to be a fixnum, but our revision is a sha1 hash from git
             runtime.defineGlobalConstant("RUBY_REVISION", runtime.newFixnum(Constants.RUBY1_9_REVISION));
-            
+        }
+        
+        if (runtime.is1_9()) {
             RubyInstanceConfig.Verbosity verbosity = runtime.getInstanceConfig().getVerbosity();
             runtime.defineVariable(new WarningGlobalVariable(runtime, "$-W", verbosity), GLOBAL);
         }
@@ -518,7 +523,7 @@ public class RubyGlobal {
         
         @Override
         public IRubyObject get() {
-            return RubyRegexp.last_match(runtime.getCurrentContext().getCurrentScope().getBackRef(runtime));
+            return RubyRegexp.last_match(runtime.getCurrentContext().getBackRef());
         }
     }
 
@@ -529,7 +534,7 @@ public class RubyGlobal {
         
         @Override
         public IRubyObject get() {
-            return RubyRegexp.match_pre(runtime.getCurrentContext().getCurrentScope().getBackRef(runtime));
+            return RubyRegexp.match_pre(runtime.getCurrentContext().getBackRef());
         }
     }
 
@@ -540,7 +545,7 @@ public class RubyGlobal {
         
         @Override
         public IRubyObject get() {
-            return RubyRegexp.match_post(runtime.getCurrentContext().getCurrentScope().getBackRef(runtime));
+            return RubyRegexp.match_post(runtime.getCurrentContext().getBackRef());
         }
     }
 
@@ -551,7 +556,7 @@ public class RubyGlobal {
         
         @Override
         public IRubyObject get() {
-            return RubyRegexp.match_last(runtime.getCurrentContext().getCurrentScope().getBackRef(runtime));
+            return RubyRegexp.match_last(runtime.getCurrentContext().getBackRef());
         }
     }
 

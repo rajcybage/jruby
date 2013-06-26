@@ -817,7 +817,7 @@ public class Helpers {
     }
     
     public static IRubyObject backref(ThreadContext context) {
-        IRubyObject backref = context.getCurrentScope().getBackRef(context.runtime);
+        IRubyObject backref = context.getBackRef();
         
         if(backref instanceof RubyMatchData) {
             ((RubyMatchData)backref).use();
@@ -826,25 +826,25 @@ public class Helpers {
     }
     
     public static IRubyObject backrefLastMatch(ThreadContext context) {
-        IRubyObject backref = context.getCurrentScope().getBackRef(context.runtime);
+        IRubyObject backref = context.getBackRef();
         
         return RubyRegexp.last_match(backref);
     }
     
     public static IRubyObject backrefMatchPre(ThreadContext context) {
-        IRubyObject backref = context.getCurrentScope().getBackRef(context.runtime);
+        IRubyObject backref = context.getBackRef();
         
         return RubyRegexp.match_pre(backref);
     }
     
     public static IRubyObject backrefMatchPost(ThreadContext context) {
-        IRubyObject backref = context.getCurrentScope().getBackRef(context.runtime);
+        IRubyObject backref = context.getBackRef();
         
         return RubyRegexp.match_post(backref);
     }
     
     public static IRubyObject backrefMatchLast(ThreadContext context) {
-        IRubyObject backref = context.getCurrentScope().getBackRef(context.runtime);
+        IRubyObject backref = context.getBackRef();
         
         return RubyRegexp.match_last(backref);
     }
@@ -1506,43 +1506,43 @@ public class Helpers {
     
     public static RubyHash constructHash19(Ruby runtime, IRubyObject key1, IRubyObject value1) {
         RubyHash hash = RubyHash.newHash(runtime);
-        hash.fastASetCheckString19(runtime, key1, value1);
+        hash.fastASetCheckString(runtime, key1, value1);
         return hash;
     }
     
     public static RubyHash constructHash19(Ruby runtime, IRubyObject key1, IRubyObject value1, IRubyObject key2, IRubyObject value2) {
         RubyHash hash = RubyHash.newHash(runtime);
-        hash.fastASetCheckString19(runtime, key1, value1);
-        hash.fastASetCheckString19(runtime, key2, value2);
+        hash.fastASetCheckString(runtime, key1, value1);
+        hash.fastASetCheckString(runtime, key2, value2);
         return hash;
     }
     
     public static RubyHash constructHash19(Ruby runtime, IRubyObject key1, IRubyObject value1, IRubyObject key2, IRubyObject value2, IRubyObject key3, IRubyObject value3) {
         RubyHash hash = RubyHash.newHash(runtime);
-        hash.fastASetCheckString19(runtime, key1, value1);
-        hash.fastASetCheckString19(runtime, key2, value2);
-        hash.fastASetCheckString19(runtime, key3, value3);
+        hash.fastASetCheckString(runtime, key1, value1);
+        hash.fastASetCheckString(runtime, key2, value2);
+        hash.fastASetCheckString(runtime, key3, value3);
         return hash;
     }
 
     public static RubyHash constructSmallHash19(Ruby runtime, IRubyObject key1, IRubyObject value1) {
         RubyHash hash = RubyHash.newSmallHash(runtime);
-        hash.fastASetSmallCheckString19(runtime, key1, value1);
+        hash.fastASetSmallCheckString(runtime, key1, value1);
         return hash;
     }
 
     public static RubyHash constructSmallHash19(Ruby runtime, IRubyObject key1, IRubyObject value1, IRubyObject key2, IRubyObject value2) {
         RubyHash hash = RubyHash.newSmallHash(runtime);
-        hash.fastASetSmallCheckString19(runtime, key1, value1);
-        hash.fastASetSmallCheckString19(runtime, key2, value2);
+        hash.fastASetSmallCheckString(runtime, key1, value1);
+        hash.fastASetSmallCheckString(runtime, key2, value2);
         return hash;
     }
 
     public static RubyHash constructSmallHash19(Ruby runtime, IRubyObject key1, IRubyObject value1, IRubyObject key2, IRubyObject value2, IRubyObject key3, IRubyObject value3) {
         RubyHash hash = RubyHash.newSmallHash(runtime);
-        hash.fastASetSmallCheckString19(runtime, key1, value1);
-        hash.fastASetSmallCheckString19(runtime, key2, value2);
-        hash.fastASetSmallCheckString19(runtime, key3, value3);
+        hash.fastASetSmallCheckString(runtime, key1, value1);
+        hash.fastASetSmallCheckString(runtime, key2, value2);
+        hash.fastASetSmallCheckString(runtime, key3, value3);
         return hash;
     }
 
@@ -1653,20 +1653,20 @@ public class Helpers {
     }
 
     public static IRubyObject setLastLine(Ruby runtime, ThreadContext context, IRubyObject value) {
-        return context.getCurrentScope().setLastLine(value);
+        return context.setLastLine(value);
     }
 
     public static IRubyObject getLastLine(Ruby runtime, ThreadContext context) {
-        return context.getCurrentScope().getLastLine(runtime);
+        return context.getLastLine();
     }
 
     public static IRubyObject setBackref(Ruby runtime, ThreadContext context, IRubyObject value) {
         if (!value.isNil() && !(value instanceof RubyMatchData)) throw runtime.newTypeError(value, runtime.getMatchData());
-        return context.getCurrentScope().setBackRef(value);
+        return context.setBackRef(value);
     }
 
     public static IRubyObject getBackref(Ruby runtime, ThreadContext context) {
-        IRubyObject backref = context.getCurrentScope().getBackRef(runtime);
+        IRubyObject backref = context.getBackRef();
         if (backref instanceof RubyMatchData) ((RubyMatchData)backref).use();
         return backref;
     }
@@ -2528,35 +2528,33 @@ public class Helpers {
     }
 
     public static IRubyObject match2AndUpdateScope(IRubyObject receiver, ThreadContext context, IRubyObject value, String scopeOffsets) {
-        DynamicScope scope = context.getCurrentScope();
         IRubyObject match = ((RubyRegexp)receiver).op_match(context, value);
-        updateScopeWithCaptures(context, scope, decodeCaptureOffsets(scopeOffsets), match);
+        updateScopeWithCaptures(context, decodeCaptureOffsets(scopeOffsets), match);
         return match;
     }
 
     public static IRubyObject match2AndUpdateScope19(IRubyObject receiver, ThreadContext context, IRubyObject value, String scopeOffsets) {
-        DynamicScope scope = context.getCurrentScope();
         IRubyObject match = ((RubyRegexp)receiver).op_match19(context, value);
-        updateScopeWithCaptures(context, scope, decodeCaptureOffsets(scopeOffsets), match);
+        updateScopeWithCaptures(context, decodeCaptureOffsets(scopeOffsets), match);
         return match;
     }
 
-    public static void updateScopeWithCaptures(ThreadContext context, DynamicScope scope, int[] scopeOffsets, IRubyObject result) {
+    public static void updateScopeWithCaptures(ThreadContext context, int[] scopeOffsets, IRubyObject result) {
         Ruby runtime = context.runtime;
         if (result.isNil()) { // match2 directly calls match so we know we can count on result
             IRubyObject nil = runtime.getNil();
 
             for (int i = 0; i < scopeOffsets.length; i++) {
-                scope.setValue(nil, scopeOffsets[i], 0);
+                context.getCurrentScope().setValue(nil, scopeOffsets[i], 0);
             }
         } else {
-            RubyMatchData matchData = (RubyMatchData)scope.getBackRef(runtime);
+            RubyMatchData matchData = (RubyMatchData)context.getBackRef();
             // FIXME: Mass assignment is possible since we know they are all locals in the same
             //   scope that are also contiguous
             IRubyObject[] namedValues = matchData.getNamedBackrefValues(runtime);
 
             for (int i = 0; i < scopeOffsets.length; i++) {
-                scope.setValue(namedValues[i], scopeOffsets[i] & 0xffff, scopeOffsets[i] >> 16);
+                context.getCurrentScope().setValue(namedValues[i], scopeOffsets[i] & 0xffff, scopeOffsets[i] >> 16);
             }
         }
     }

@@ -38,33 +38,6 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import static org.jruby.CompatVersion.RUBY1_8;
-import static org.jruby.CompatVersion.RUBY1_9;
-import static org.jruby.RubyEnumerator.enumeratorize;
-import static org.jruby.anno.FrameField.BACKREF;
-import static org.jruby.runtime.Helpers.invokedynamic;
-import static org.jruby.runtime.invokedynamic.MethodNames.OP_CMP;
-import static org.jruby.runtime.invokedynamic.MethodNames.OP_EQUAL;
-import static org.jruby.runtime.Visibility.PRIVATE;
-import static org.jruby.util.StringSupport.CR_7BIT;
-import static org.jruby.util.StringSupport.CR_BROKEN;
-import static org.jruby.util.StringSupport.CR_MASK;
-import static org.jruby.util.StringSupport.CR_UNKNOWN;
-import static org.jruby.util.StringSupport.CR_VALID;
-import static org.jruby.util.StringSupport.codeLength;
-import static org.jruby.util.StringSupport.codePoint;
-import static org.jruby.util.StringSupport.codeRangeScan;
-import static org.jruby.util.StringSupport.searchNonAscii;
-import static org.jruby.util.StringSupport.strLengthWithCodeRange;
-import static org.jruby.util.StringSupport.toLower;
-import static org.jruby.util.StringSupport.toUpper;
-import static org.jruby.util.StringSupport.unpackArg;
-import static org.jruby.util.StringSupport.unpackResult;
-
-import java.io.UnsupportedEncodingException;
-import java.nio.charset.Charset;
-import java.util.Locale;
-
 import org.jcodings.Encoding;
 import org.jcodings.EncodingDB;
 import org.jcodings.ascii.AsciiTables;
@@ -81,10 +54,9 @@ import org.joni.Regex;
 import org.joni.Region;
 import org.jruby.anno.JRubyClass;
 import org.jruby.anno.JRubyMethod;
-import org.jruby.runtime.Helpers;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.ClassIndex;
-import org.jruby.runtime.DynamicScope;
+import org.jruby.runtime.Helpers;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -103,9 +75,34 @@ import org.jruby.util.Sprintf;
 import org.jruby.util.StringSupport;
 import org.jruby.util.TypeConverter;
 import org.jruby.util.XMLConverter;
-import org.jruby.util.log.Logger;
-import org.jruby.util.log.LoggerFactory;
 import org.jruby.util.string.JavaCrypt;
+
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
+import java.util.Locale;
+
+import static org.jruby.CompatVersion.RUBY1_8;
+import static org.jruby.CompatVersion.RUBY1_9;
+import static org.jruby.RubyEnumerator.enumeratorize;
+import static org.jruby.anno.FrameField.BACKREF;
+import static org.jruby.runtime.Helpers.invokedynamic;
+import static org.jruby.runtime.Visibility.PRIVATE;
+import static org.jruby.runtime.invokedynamic.MethodNames.OP_CMP;
+import static org.jruby.runtime.invokedynamic.MethodNames.OP_EQUAL;
+import static org.jruby.util.StringSupport.CR_7BIT;
+import static org.jruby.util.StringSupport.CR_BROKEN;
+import static org.jruby.util.StringSupport.CR_MASK;
+import static org.jruby.util.StringSupport.CR_UNKNOWN;
+import static org.jruby.util.StringSupport.CR_VALID;
+import static org.jruby.util.StringSupport.codeLength;
+import static org.jruby.util.StringSupport.codePoint;
+import static org.jruby.util.StringSupport.codeRangeScan;
+import static org.jruby.util.StringSupport.searchNonAscii;
+import static org.jruby.util.StringSupport.strLengthWithCodeRange;
+import static org.jruby.util.StringSupport.toLower;
+import static org.jruby.util.StringSupport.toUpper;
+import static org.jruby.util.StringSupport.unpackArg;
+import static org.jruby.util.StringSupport.unpackResult;
 
 /**
  * Implementation of Ruby String class
@@ -116,8 +113,6 @@ import org.jruby.util.string.JavaCrypt;
  */
 @JRubyClass(name="String", include={"Enumerable", "Comparable"})
 public class RubyString extends RubyObject implements EncodingCapable, MarshalEncoding {
-
-    private static final Logger LOG = LoggerFactory.getLogger("RubyString");
 
     private static final ASCIIEncoding ASCII = ASCIIEncoding.INSTANCE;
     private static final UTF8Encoding UTF8 = UTF8Encoding.INSTANCE;
@@ -155,12 +150,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         runtime.setString(stringClass);
         stringClass.index = ClassIndex.STRING;
         stringClass.setReifiedClass(RubyString.class);
-        stringClass.kindOf = new RubyModule.KindOf() {
-            @Override
-                public boolean isKindOf(IRubyObject obj, RubyModule type) {
-                    return obj instanceof RubyString;
-                }
-            };
+        stringClass.kindOf = new RubyModule.JavaClassKindOf(RubyString.class);
 
         stringClass.includeModule(runtime.getComparable());
         if (!runtime.is1_9()) stringClass.includeModule(runtime.getEnumerable());
@@ -390,8 +380,9 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
      */
     @Override
     public final boolean eql(IRubyObject other) {
-        Ruby runtime = getRuntime();
-        if (getMetaClass() != runtime.getString() || getMetaClass() != other.getMetaClass()) return super.eql(other);
+        RubyClass metaclass = getMetaClass();
+        Ruby runtime = metaclass.getClassRuntime();
+        if (metaclass != runtime.getString() || metaclass != other.getMetaClass()) return super.eql(other);
         return runtime.is1_9() ? eql19(runtime, other) : eql18(runtime, other);
     }
 
@@ -561,8 +552,6 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         Charset rubyInt = null;
         if (internal != null && internal.getCharset() != null) rubyInt = internal.getCharset();
 
-        // Java external, used if no internal
-        Charset javaExt = Charset.defaultCharset();
         Encoding javaExtEncoding = runtime.getEncodingService().getJavaDefault();
 
         if (rubyInt == null) {
@@ -864,6 +853,15 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
         if (len == 0) {
             shared = newEmptyString(runtime, meta, enc);
+        } else if (len == 1) {
+            // as with the 1.8 makeShared, don't bother sharing for substrings that are a single byte
+            // to get a good speed boost in a number of common scenarios (note though that unlike 1.8,
+            // we can't take advantage of SINGLE_CHAR_BYTELISTS since our encoding may not be ascii, but the
+            // single byte copy is pretty much negligible)
+            shared = newStringShared(runtime,
+                                     meta,
+                                     new ByteList(new byte[] { (byte) value.get(index) }, enc),
+                                     enc);
         } else {
             if (shareLevel == SHARE_LEVEL_NONE) shareLevel = SHARE_LEVEL_BUFFER;
             shared = new RubyString(runtime, meta, value.makeShared(index, len));
@@ -1388,7 +1386,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         int cr2 = cr;
 
         if (toEnc == enc) {
-            if (toCr == CR_UNKNOWN || (toEnc == ASCIIEncoding.INSTANCE && toCr != CR_7BIT)) {
+            if (toCr == CR_UNKNOWN) {
                 cr = CR_UNKNOWN;
             } else if (cr == CR_UNKNOWN) {
                 cr = codeRangeScan(enc, bytes, p, len);
@@ -1422,7 +1420,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
             resCr = CR_UNKNOWN;
         } else if (toCr == CR_7BIT) {
             if (cr == CR_7BIT) {
-                resEnc = toEnc != ASCIIEncoding.INSTANCE ? toEnc : enc;
+                resEnc = toEnc;
                 resCr = CR_7BIT;
             } else {
                 resEnc = enc;
@@ -2724,20 +2722,20 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         int range = value.getBegin() + value.getRealSize();
         Matcher matcher = pattern.matcher(value.getUnsafeBytes(), value.getBegin(), range);
 
-        DynamicScope scope = context.getCurrentScope();
         if (RubyRegexp.matcherSearch(context.runtime, matcher, value.getBegin(), range, Option.NONE) >= 0) {
             frozenCheck(true);
             byte[] bytes = value.getUnsafeBytes();
             int size = value.getRealSize();
-            RubyMatchData match = RubyRegexp.updateBackRef(context, this, scope, matcher, pattern);
+            RubyMatchData match = RubyRegexp.createMatchData(context, this, matcher, pattern);
+            context.setBackRef(match);
             RubyString repl = objAsString(context, block.yield(context,
                     makeShared(context.runtime, matcher.getBegin(), matcher.getEnd() - matcher.getBegin())));
             modifyCheck(bytes, size);
             frozenCheck(true);
-            scope.setBackRef(match);
+            context.setBackRef(match);
             return subBangCommon(context, pattern, matcher, repl, repl.flags);
         } else {
-            return scope.setBackRef(context.runtime.getNil());
+            return context.setBackRef(context.runtime.getNil());
         }
     }
 
@@ -2746,13 +2744,13 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         int range = value.getBegin() + value.getRealSize();
         Matcher matcher = pattern.matcher(value.getUnsafeBytes(), value.getBegin(), range);
 
-        DynamicScope scope = context.getCurrentScope();
         if (RubyRegexp.matcherSearch(context.runtime, matcher, value.getBegin(), range, Option.NONE) >= 0) {
             repl = RubyRegexp.regsub(repl, this, matcher, context.runtime.getKCode().getEncoding());
-            RubyRegexp.updateBackRef(context, this, scope, matcher, pattern);
+            RubyMatchData match = RubyRegexp.createMatchData(context, this, matcher, pattern);
+            context.setBackRef(match);
             return subBangCommon(context, pattern, matcher, repl, tuFlags);
         } else {
-            return scope.setBackRef(context.runtime.getNil());
+            return context.setBackRef(context.runtime.getNil());
         }
     }
 
@@ -2847,10 +2845,10 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         Encoding enc = value.getEncoding();
         final Matcher matcher = prepared.matcher(bytes, begin, range);
 
-        DynamicScope scope = context.getCurrentScope();
         if (RubyRegexp.matcherSearch(runtime, matcher, begin, range, Option.NONE) >= 0) {
-            RubyMatchData match = RubyRegexp.updateBackRef19(context, this, scope, matcher, pattern);
+            RubyMatchData match = RubyRegexp.createMatchData19(context, this, matcher, pattern);
             match.regexp = regexp;
+            context.setBackRef(match);
             final RubyString repl;
             final int tuFlags;
             IRubyObject subStr = makeShared19(runtime, matcher.getBegin(), matcher.getEnd() - matcher.getBegin());
@@ -2864,10 +2862,9 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
             modifyCheck(bytes, len, enc);
             frozenCheck();
-            scope.setBackRef(match);
             return subBangCommon19(context, pattern, matcher, repl, tuFlags | repl.flags);
         } else {
-            return scope.setBackRef(runtime.getNil());
+            return context.setBackRef(runtime.getNil());
         }
     }
 
@@ -2876,14 +2873,14 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         int range = begin + value.getRealSize();
         final Matcher matcher = prepared.matcher(value.getUnsafeBytes(), begin, range);
 
-        DynamicScope scope = context.getCurrentScope();
         if (RubyRegexp.matcherSearch(runtime, matcher, begin, range, Option.NONE) >= 0) {
             repl = RubyRegexp.regsub19(repl, this, matcher, pattern);
-            RubyMatchData match = RubyRegexp.updateBackRef19(context, this, scope, matcher, pattern);
+            RubyMatchData match = RubyRegexp.createMatchData19(context, this, matcher, pattern);
             match.regexp = regexp;
+            context.setBackRef(match);
             return subBangCommon19(context, pattern, matcher, repl, repl.flags);
         } else {
-            return scope.setBackRef(runtime.getNil());
+            return context.setBackRef(runtime.getNil());
         }
     }
 
@@ -2977,7 +2974,6 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
     private IRubyObject gsubCommon(ThreadContext context, final boolean bang, IRubyObject arg, Block block, RubyString repl, int tuFlags) {
         Ruby runtime = context.runtime;
-        DynamicScope scope = context.getCurrentScope();
         Regex pattern = getQuotedPattern(arg);
 
         int begin = value.getBegin();
@@ -2988,7 +2984,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
         int beg = RubyRegexp.matcherSearch(runtime, matcher, begin, range, Option.NONE);
         if (beg < 0) {
-            scope.setBackRef(runtime.getNil());
+            context.setBackRef(runtime.getNil());
             return bang ? runtime.getNil() : strDup(runtime); /* bang: true, no match, no substitution */
         } else if (repl == null && bang && isFrozen()) {
             throw getRuntime().newRuntimeError("can't modify frozen string");
@@ -3008,7 +3004,8 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
             final int endz = matcher.getEnd();
 
             if (repl == null) { // block given
-                match = RubyRegexp.updateBackRef(context, this, scope, matcher, pattern);
+                match = RubyRegexp.createMatchData(context, this, matcher, pattern);
+                context.setBackRef(match);
                 val = objAsString(context, block.yield(context, substr(runtime, begz, endz - begz)));
                 modifyCheck(bytes, slen);
                 if (bang) frozenCheck();
@@ -3047,9 +3044,10 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         }
 
         if (repl == null) { // block given
-            scope.setBackRef(match);
+            context.setBackRef(match);
         } else {
-            RubyRegexp.updateBackRef(context, this, scope, matcher, pattern);
+            match = RubyRegexp.createMatchData(context, this, matcher, pattern);
+            context.setBackRef(match);
         }
 
         if (slen > offset) {
@@ -3141,12 +3139,9 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         byte[]bytes = value.getUnsafeBytes();
         final Matcher matcher = prepared.matcher(bytes, begin, range);
 
-        DynamicScope scope = null;
-        if (useBackref) scope = context.getCurrentScope();
-        
         int beg = RubyRegexp.matcherSearch(runtime, matcher, begin, range, Option.NONE);
         if (beg < 0) {
-            if (useBackref) scope.setBackRef(runtime.getNil());
+            if (useBackref) context.setBackRef(runtime.getNil());
             return bang ? runtime.getNil() : strDup(runtime); /* bang: true, no match, no substitution */
         }
 
@@ -3169,8 +3164,9 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
                 if (hash != null) { // hash given
                     val = objAsString(context, hash.op_aref(context, substr)); 
                 } else {            // block given
-                    match = RubyRegexp.updateBackRef19(context, this, scope, matcher, pattern, useBackref);
+                    match = RubyRegexp.createMatchData19(context, this, matcher, pattern);
                     match.regexp = regexp;
+                    context.setBackRef(match);
                     val = objAsString(context, block.yield(context, substr));
                 }
                 modifyCheck(bytes, slen, enc);
@@ -3197,10 +3193,11 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         if (slen > offset) dest.cat(bytes, cp, slen - offset, enc);
 
         if (match != null) { // block given
-            if (useBackref) scope.setBackRef(match);
+            if (useBackref) context.setBackRef(match);
         } else {
-            match = RubyRegexp.updateBackRef19(context, this, scope, matcher, pattern, useBackref);
+            match = RubyRegexp.createMatchData19(context, this, matcher, pattern);
             match.regexp = regexp;
+            context.setBackRef(match);
         }
 
         if (bang) {
@@ -3228,7 +3225,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
             pos += value.getRealSize();
             if (pos < 0) {
                 if (arg0 instanceof RubyRegexp) {
-                    context.getCurrentScope().setBackRef(runtime.getNil());
+                    context.setBackRef(runtime.getNil());
                 }
                 return runtime.getNil();
             }
@@ -3241,7 +3238,9 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
             RubyRegexp regSub = (RubyRegexp) sub;
 
             pos = regSub.adjustStartPos(this, pos, false);
-            pos = regSub.search(context, this, pos, false);
+            IRubyObject[] holder = {context.nil};
+            pos = regSub.search(context, this, pos, false, holder);
+            context.setBackRef(holder[0]);
         } else if (sub instanceof RubyFixnum) {
             int c_int = RubyNumeric.fix2int((RubyFixnum)sub);
             if (c_int < 0x00 || c_int > 0xFF) {
@@ -3298,7 +3297,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         if (pos < 0) {
             pos += strLength();
             if (pos < 0) {
-                if (arg0 instanceof RubyRegexp) context.getCurrentScope().setBackRef(runtime.getNil());
+                if (arg0 instanceof RubyRegexp) context.setBackRef(runtime.getNil());
                 return runtime.getNil();
             }
         }
@@ -3313,7 +3312,9 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
                             value.getBegin() + value.getRealSize(),
                                       pos) - value.getBegin();
             pos = regSub.adjustStartPos19(this, pos, false);
-            pos = regSub.search19(context, this, pos, false);
+            IRubyObject[] holder = {context.nil};
+            pos = regSub.search19(context, this, pos, false, holder);
+            context.setBackRef(holder[0]);
             pos = subLength(pos);
         } else if (sub instanceof RubyString) {
             pos = strIndex19((RubyString) sub, pos);
@@ -3375,7 +3376,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         if (pos < 0) {
             pos += value.getRealSize();
             if (pos < 0) {
-                if (arg0 instanceof RubyRegexp) context.getCurrentScope().setBackRef(runtime.getNil());
+                if (arg0 instanceof RubyRegexp) context.setBackRef(runtime.getNil());
                 return runtime.getNil();
             }
         }            
@@ -3388,7 +3389,9 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
             RubyRegexp regSub = (RubyRegexp) sub;
             if (regSub.length() > 0) {
                 pos = regSub.adjustStartPos(this, pos, true);
-                pos = regSub.search(context, this, pos, true) - value.getBegin();
+                IRubyObject[] holder = {context.nil};
+                pos = regSub.search(context, this, pos, true, holder) - value.getBegin();
+                context.setBackRef(holder[0]);
             }
         } else if (sub instanceof RubyString) {
             pos = strRindex((RubyString) sub, pos);
@@ -3446,7 +3449,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         if (pos < 0) {
             pos += length;
             if (pos < 0) {
-                if (arg0 instanceof RubyRegexp) context.getCurrentScope().setBackRef(runtime.getNil());
+                if (arg0 instanceof RubyRegexp) context.setBackRef(runtime.getNil());
                 return runtime.getNil();
             }
         }            
@@ -3463,7 +3466,9 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
                                       pos) - value.getBegin();
             if (regSub.length() > 0) {
                 pos = regSub.adjustStartPos19(this, pos, true);
-                pos = regSub.search19(context, this, pos, true);
+                IRubyObject[] holder = {context.nil};
+                pos = regSub.search19(context, this, pos, true, holder);
+                context.setBackRef(holder[0]);
                 pos = subLength(pos);
             }
         } else if (sub instanceof RubyString) {
@@ -3753,8 +3758,17 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
      */
     private void subpatSet(ThreadContext context, RubyRegexp regexp, int nth, IRubyObject repl) {
         Ruby runtime = context.runtime;
-        if (regexp.search(context, this, 0, false) < 0) throw runtime.newIndexError("regexp not matched");
-        RubyMatchData match = (RubyMatchData)context.getCurrentScope().getBackRef(runtime);
+        IRubyObject[] holder = {context.nil};
+        
+        int result = regexp.search(context, this, 0, false, holder);
+        context.setBackRef(holder[0]);
+        
+        if (result < 0) {
+            throw runtime.newIndexError("regexp not matched");
+        }
+        
+        // this cast should be ok, since nil matchdata will be < 0 above
+        RubyMatchData match = (RubyMatchData)holder[0];
 
         nth = subpatSetCheck(runtime, nth, match.regs);
 
@@ -3783,16 +3797,26 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
     }
 
     private IRubyObject subpat(Ruby runtime, ThreadContext context, RubyRegexp regex, int nth) {
-        if (regex.search(context, this, 0, false) >= 0) {
-            return RubyRegexp.nth_match(nth, context.getCurrentScope().getBackRef(runtime));
+        IRubyObject[] holder = {context.nil};
+        int result = regex.search(context, this, 0, false, holder);
+        context.setBackRef(holder[0]);
+        if (result >= 0) {
+            return RubyRegexp.nth_match(nth, holder[0]);
         }
         return runtime.getNil();
     }
 
     private void subpatSet19(ThreadContext context, RubyRegexp regexp, IRubyObject backref, IRubyObject repl) {
         Ruby runtime = context.runtime;
-        if (regexp.search19(context, this, 0, false) < 0) throw runtime.newIndexError("regexp not matched");
-        RubyMatchData match = (RubyMatchData)context.getCurrentScope().getBackRef(runtime);
+        IRubyObject[] holder = {context.nil};
+        
+        int result = regexp.search19(context, this, 0, false, holder);
+        context.setBackRef(holder[0]);
+        
+        if (result < 0) throw runtime.newIndexError("regexp not matched");
+        
+        // this cast should be ok, since nil matchdata will be < 0 above
+        RubyMatchData match = (RubyMatchData)holder[0];
 
         int nth = backref == null ? 0 : subpatSetCheck(runtime, match.backrefNumber(backref), match.regs);
 
@@ -3813,17 +3837,29 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
     }
 
     private IRubyObject subpat19(Ruby runtime, ThreadContext context, RubyRegexp regex, IRubyObject backref) {
-        if (regex.search19(context, this, 0, false) >= 0) {
-            RubyMatchData match = (RubyMatchData)context.getCurrentScope().getBackRef(runtime);
-            return RubyRegexp.nth_match(match.backrefNumber(backref), context.getCurrentScope().getBackRef(runtime));
+        IRubyObject[] holder = {context.nil};
+        
+        int result = regex.search19(context, this, 0, false, holder);
+        context.setBackRef(holder[0]);
+        
+        if (result >= 0) {
+            RubyMatchData match = (RubyMatchData)holder[0];
+            return RubyRegexp.nth_match(match.backrefNumber(backref), match);
         }
+        
         return runtime.getNil();
     }
 
     private IRubyObject subpat19(Ruby runtime, ThreadContext context, RubyRegexp regex) {
-        if (regex.search19(context, this, 0, false) >= 0) {
-            return RubyRegexp.nth_match(0, context.getCurrentScope().getBackRef(runtime));
+        IRubyObject[] holder = {context.nil};
+        
+        int result = regex.search19(context, this, 0, false, holder);
+        context.setBackRef(holder[0]);
+        
+        if (result >= 0) {
+            return RubyRegexp.nth_match(0, holder[0]);
         }
+        
         return runtime.getNil();
     }
 
@@ -4652,7 +4688,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         }
 
         // only this case affects backrefs 
-        context.getCurrentScope().setBackRef(runtime.getNil());
+        context.setBackRef(runtime.getNil());
 
         if (len > 0 && (limit || len > beg || lim < 0)) result.append(makeShared(runtime, beg, len - beg));
         return result;
@@ -4831,7 +4867,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         }
 
         // only this case affects backrefs 
-        if (useBackref) context.getCurrentScope().setBackRef(runtime.getNil());
+        if (useBackref) context.setBackRef(runtime.getNil());
 
         if (len > 0 && (limit || len > beg || lim < 0)) result.append(makeShared19(runtime, beg, len - beg));
         return result;
@@ -5021,29 +5057,30 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         byte[]bytes = value.getUnsafeBytes();
         int size = value.getRealSize();
         RubyMatchData match = null;
-        DynamicScope scope = context.getCurrentScope();
 
         int end = 0;
         if (pattern.numberOfCaptures() == 0) {
             while (RubyRegexp.matcherSearch(runtime, matcher, begin + end, range, Option.NONE) >= 0) {
                 end = positionEnd(matcher, enc, begin, range);
-                match = RubyRegexp.updateBackRef(context, this, scope, matcher, pattern);
+                match = RubyRegexp.createMatchData(context, this, matcher, pattern);
                 RubyString substr = makeShared(runtime, matcher.getBegin(), matcher.getEnd() - matcher.getBegin());
                 substr.infectBy(tuFlags);
                 match.infectBy(tuFlags);
+                context.setBackRef(match);
                 block.yield(context, substr);
                 modifyCheck(bytes, size);
             }
         } else {
             while (RubyRegexp.matcherSearch(runtime, matcher, begin + end, range, Option.NONE) >= 0) {
                 end = positionEnd(matcher, enc, begin, range);
-                match = RubyRegexp.updateBackRef(context, this, scope, matcher, pattern);
+                match = RubyRegexp.createMatchData(context, this, matcher, pattern);
                 match.infectBy(tuFlags);
+                context.setBackRef(match);  
                 block.yield(context, populateCapturesForScan(runtime, matcher, range, tuFlags, false));
                 modifyCheck(bytes, size);
             }
         }
-        scope.setBackRef(match == null ? runtime.getNil() : match);
+        context.setBackRef(match == null ? runtime.getNil() : match);
         return this;
     }
 
@@ -5066,12 +5103,12 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
             }
         }
 
-        DynamicScope scope = context.getCurrentScope();
         if (ary.size() > 0) {
-            RubyMatchData match = RubyRegexp.updateBackRef(context, this, scope, matcher, pattern);
+            RubyMatchData match = RubyRegexp.createMatchData(context, this, matcher, pattern);
             match.infectBy(tuFlags);
+            context.setBackRef(match);
         } else {
-            scope.setBackRef(runtime.getNil());
+            context.setBackRef(runtime.getNil());
         }
         return ary;
     }
@@ -5139,32 +5176,32 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         int range = begin + len;
         final Matcher matcher = prepared.matcher(bytes, begin, range);
 
-        DynamicScope scope = context.getCurrentScope();
-
         int end = 0;
         RubyMatchData match = null;
         if (pattern.numberOfCaptures() == 0) {
             while (RubyRegexp.matcherSearch(runtime, matcher, begin + end, range, Option.NONE) >= 0) {
                 end = positionEnd(matcher, enc, begin, range);
-                match = RubyRegexp.updateBackRef19(context, this, scope, matcher, pattern);
+                match = RubyRegexp.createMatchData19(context, this, matcher, pattern);
                 match.regexp = regexp;
                 RubyString substr = makeShared19(runtime, matcher.getBegin(), matcher.getEnd() - matcher.getBegin());
                 substr.infectBy(tuFlags);
                 match.infectBy(tuFlags);
+                context.setBackRef(match);
                 block.yield(context, substr);
                 modifyCheck(bytes, len, enc);
             }
         } else {
             while (RubyRegexp.matcherSearch(runtime, matcher, begin + end, range, Option.NONE) >= 0) {
                 end = positionEnd(matcher, enc, begin, range);
-                match = RubyRegexp.updateBackRef19(context, this, scope, matcher, pattern);
+                match = RubyRegexp.createMatchData19(context, this, matcher, pattern);
                 match.regexp = regexp;
                 match.infectBy(tuFlags);
+                context.setBackRef(match);
                 block.yield(context, populateCapturesForScan(runtime, matcher, range, tuFlags, true));
                 modifyCheck(bytes, len, enc);
             }
         }
-        scope.setBackRef(match == null ? runtime.getNil() : match);
+        context.setBackRef(match == null ? runtime.getNil() : match);
         return this;
     }
 
@@ -5192,13 +5229,13 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
             }
         }
 
-        DynamicScope scope = context.getCurrentScope();
         if (ary.size() > 0) {
-            RubyMatchData match = RubyRegexp.updateBackRef19(context, this, scope, matcher, pattern);
+            RubyMatchData match = RubyRegexp.createMatchData19(context, this, matcher, pattern);
             match.regexp = regexp;
             match.infectBy(tuFlags);
+            context.setBackRef(match);
         } else {
-            scope.setBackRef(runtime.getNil());
+            context.setBackRef(runtime.getNil());
         }
         return ary;
     }
@@ -5517,7 +5554,10 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         final RubyString sep;
         if (arg instanceof RubyRegexp) {
             RubyRegexp regex = (RubyRegexp)arg;
-            pos = regex.search19(context, this, 0, false);
+            IRubyObject[] holder = {context.nil};
+        
+            pos = regex.search19(context, this, 0, false, holder);
+            context.setBackRef(holder[0]);
             if (pos < 0) return partitionMismatch(runtime);
             sep = (RubyString)subpat19(runtime, context, regex);
             if (pos == 0 && sep.value.getRealSize() == 0) return partitionMismatch(runtime);
@@ -5546,9 +5586,13 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         final RubyString sep;
         if (arg instanceof RubyRegexp) {
             RubyRegexp regex = (RubyRegexp)arg;
-            pos = regex.search19(context, this, value.getRealSize(), true);
+            IRubyObject[] holder = {context.nil};
+        
+            pos = regex.search19(context, this, value.getRealSize(), true, holder);
+            context.setBackRef(holder[0]);
+            
             if (pos < 0) return rpartitionMismatch(runtime);
-            sep = (RubyString)RubyRegexp.nth_match(0, context.getCurrentScope().getBackRef(runtime));
+            sep = (RubyString)RubyRegexp.nth_match(0, holder[0]);
         } else {
             IRubyObject tmp = arg.checkStringType();
             if (tmp.isNil()) throw runtime.newTypeError("type mismatch: " + arg.getMetaClass().getName() + " given");

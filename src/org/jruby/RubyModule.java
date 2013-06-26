@@ -144,12 +144,7 @@ public class RubyModule extends RubyObject {
     public static RubyClass createModuleClass(Ruby runtime, RubyClass moduleClass) {
         moduleClass.index = ClassIndex.MODULE;
         moduleClass.setReifiedClass(RubyModule.class);
-        moduleClass.kindOf = new RubyModule.KindOf() {
-            @Override
-            public boolean isKindOf(IRubyObject obj, RubyModule type) {
-                return obj instanceof RubyModule;
-            }
-        };
+        moduleClass.kindOf = new RubyModule.JavaClassKindOf(RubyModule.class);
         
         moduleClass.defineAnnotatedMethods(RubyModule.class);
         moduleClass.defineAnnotatedMethods(ModuleKernelMethods.class);
@@ -204,6 +199,18 @@ public class RubyModule extends RubyObject {
             return obj.getMetaClass().hasModuleInHierarchy(type);
         }
     }
+
+		public static final class JavaClassKindOf extends RubyModule.KindOf {
+			private final Class klass;
+			public JavaClassKindOf(Class klass) { 
+				this.klass = klass;
+			}
+
+			@Override
+			public boolean isKindOf(IRubyObject obj, RubyModule type) {
+				return klass.isInstance(obj);
+			}
+		}
     
     public boolean isInstance(IRubyObject object) {
         return kindOf.isKindOf(object, this);
@@ -557,6 +564,7 @@ public class RubyModule extends RubyObject {
         doIncludeModule(module);
         invalidateCoreClasses();
         invalidateCacheDescendants();
+        invalidateConstantCacheForModuleInclusion(module);
     }
     
     public void defineAnnotatedMethod(Class clazz, String name) {
@@ -974,6 +982,15 @@ public class RubyModule extends RubyObject {
         
         return null;
     }
+
+    private void invalidateConstantCacheForModuleInclusion(RubyModule module)
+    {
+        for (RubyModule mod : gatherModules(module)) {
+            for (String key : mod.getConstantMap().keySet()) {
+                invalidateConstantCache(key);
+            }
+        }
+    }
     
     protected static abstract class CacheEntryFactory {
         public abstract CacheEntry newCacheEntry(DynamicMethod method, int token);
@@ -1126,8 +1143,8 @@ public class RubyModule extends RubyObject {
         methodInvalidator.invalidate();
     }
     
-    protected void invalidateConstantCache() {
-        getRuntime().getConstantInvalidator().invalidate();
+    protected void invalidateConstantCache(String constantName) {
+        getRuntime().getConstantInvalidator(constantName).invalidate();
     }    
 
     /**
@@ -1444,7 +1461,12 @@ public class RubyModule extends RubyObject {
         String name = arg0.asJavaString().intern();
         DynamicMethod newMethod = null;
         Visibility visibility = PUBLIC;
+        
+        if (!block.isGiven()) {
+            throw getRuntime().newArgumentError("tried to create Proc object without a block");
+        }
 
+        block = block.cloneBlockAndFrame();
         RubyProc proc = runtime.newProc(Block.Type.LAMBDA, block);
 
         // a normal block passed to define_method changes to do arity checking; make it a lambda
@@ -2601,7 +2623,7 @@ public class RubyModule extends RubyObject {
         String name = validateConstant(rubyName.asJavaString());
         IRubyObject value;
         if ((value = deleteConstant(name)) != null) {
-            invalidateConstantCache();
+            invalidateConstantCache(name);
             if (value != UNDEF) {
                 return value;
             }
@@ -2713,34 +2735,38 @@ public class RubyModule extends RubyObject {
     }
 
     @JRubyMethod(compat = RUBY1_9)
-    public IRubyObject private_constant(ThreadContext context, IRubyObject name) {
-        setConstantVisibility(context, validateConstant(name.asJavaString()), true);
-        invalidateConstantCache();
+    public IRubyObject private_constant(ThreadContext context, IRubyObject rubyName) {
+        String name = rubyName.asJavaString();
+        setConstantVisibility(context, validateConstant(name), true);
+        invalidateConstantCache(name);
         return this;
     }
 
     @JRubyMethod(compat = RUBY1_9, required = 1, rest = true)
-    public IRubyObject private_constant(ThreadContext context, IRubyObject[] names) {
-        for (IRubyObject name : names) {
-            setConstantVisibility(context, validateConstant(name.asJavaString()), true);
+    public IRubyObject private_constant(ThreadContext context, IRubyObject[] rubyNames) {
+        for (IRubyObject rubyName : rubyNames) {
+            String name = rubyName.asJavaString();
+            setConstantVisibility(context, validateConstant(name), true);
+            invalidateConstantCache(name);
         }
-        invalidateConstantCache();
         return this;
     }
 
     @JRubyMethod(compat = RUBY1_9)
-    public IRubyObject public_constant(ThreadContext context, IRubyObject name) {
-        setConstantVisibility(context, validateConstant(name.asJavaString()), false);
-        invalidateConstantCache();
+    public IRubyObject public_constant(ThreadContext context, IRubyObject rubyName) {
+        String name = rubyName.asJavaString();
+        setConstantVisibility(context, validateConstant(name), false);
+        invalidateConstantCache(name);
         return this;
     }
 
     @JRubyMethod(compat = RUBY1_9, required = 1, rest = true)
-    public IRubyObject public_constant(ThreadContext context, IRubyObject[] names) {
-        for (IRubyObject name : names) {
-            setConstantVisibility(context, validateConstant(name.asJavaString()), false);
+    public IRubyObject public_constant(ThreadContext context, IRubyObject[] rubyNames) {
+        for (IRubyObject rubyName : rubyNames) {
+            String name = rubyName.asJavaString();
+            setConstantVisibility(context, validateConstant(name), false);
+            invalidateConstantCache(name);
         }
-        invalidateConstantCache();
         return this;
     }
 
@@ -3064,7 +3090,7 @@ public class RubyModule extends RubyObject {
             storeConstant(name, value);
         }
 
-        invalidateConstantCache();
+        invalidateConstantCache(name);
         
         // if adding a module under a constant name, set that module's basename to the constant name
         if (value instanceof RubyModule) {

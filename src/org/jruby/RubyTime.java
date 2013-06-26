@@ -196,7 +196,8 @@ public class RubyTime extends RubyObject {
             String hours = tzMatcher.group(3);
             String minutes = tzMatcher.group(4);
             
-            if (Integer.parseInt(hours) > 23 || Integer.parseInt(minutes) > 59) {
+            if (Integer.parseInt(hours) > 23 ||
+                    (minutes != null && Integer.parseInt(minutes) > 59)) {
                 throw runtime.newArgumentError("utc_offset out of range");
             }
             
@@ -670,6 +671,16 @@ public class RubyTime extends RubyObject {
 
         String result = simpleDateFormat.print(dt);
 
+        if (isTzRelative) {
+            // display format needs to invert the UTC offset if this object was
+            // created with a specific offset in the 7-arg form of #new
+            DateTimeZone dtz = dt.getZone();
+            int offset = (-1) * dtz.toTimeZone().getOffset(dt.getMillis());
+            DateTimeZone invertedDTZ = DateTimeZone.forOffsetMillis(offset);
+            DateTime invertedDT = dt.withZone(invertedDTZ);
+            result = simpleDateFormat.print(invertedDT);
+        }
+
         return getRuntime().newString(result);
     }
 
@@ -795,8 +806,10 @@ public class RubyTime extends RubyObject {
     }
 
     @JRubyMethod(name = "zone")
-    public RubyString zone() {
+    public IRubyObject zone() {
         Ruby runtime = getRuntime();
+        if (isTzRelative) return runtime.getNil();
+        
         String envTZ = getEnvTimeZone(runtime).toString();
         // see declaration of SHORT_TZNAME
         if (SHORT_STD_TZNAME.containsKey(envTZ) && ! dt.getZone().toTimeZone().inDaylightTime(dt.toDate())) {

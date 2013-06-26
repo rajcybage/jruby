@@ -49,7 +49,7 @@ import java.util.NoSuchElementException;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
-import org.jcodings.specific.ASCIIEncoding;
+import org.jcodings.specific.USASCIIEncoding;
 import org.jruby.anno.JRubyClass;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.common.IRubyWarnings.ID;
@@ -120,12 +120,7 @@ public class RubyHash extends RubyObject implements Map {
         hashc.index = ClassIndex.HASH;
         hashc.setReifiedClass(RubyHash.class);
         
-        hashc.kindOf = new RubyModule.KindOf() {
-            @Override
-            public boolean isKindOf(IRubyObject obj, RubyModule type) {
-                return obj instanceof RubyHash;
-            }
-        };
+        hashc.kindOf = new RubyModule.JavaClassKindOf(RubyHash.class);
 
         hashc.includeModule(runtime.getEnumerable());
 
@@ -425,12 +420,14 @@ public class RubyHash extends RubyObject implements Map {
         return ((h & HASH_SIGN_BIT_MASK) % length);
     }
 
-    private final void resize(int newCapacity) {
+    private final synchronized void resize(int newCapacity) {
         final RubyHashEntry[] oldTable = table;
         final RubyHashEntry[] newTable = new RubyHashEntry[newCapacity];
+        
         for (int j = 0; j < oldTable.length; j++) {
             RubyHashEntry entry = oldTable[j];
             oldTable[j] = null;
+            
             while (entry != null) {
                 RubyHashEntry next = entry.next;
                 int i = bucketIndex(entry.hash, newCapacity);
@@ -439,6 +436,7 @@ public class RubyHash extends RubyObject implements Map {
                 entry = next;
             }
         }
+        
         table = newTable;
     }
 
@@ -785,7 +783,7 @@ public class RubyHash extends RubyObject implements Map {
     }
     
     private IRubyObject inspectHash19(final ThreadContext context) {
-        final RubyString str = RubyString.newStringLight(context.runtime, DEFAULT_INSPECT_STR_SIZE, ASCIIEncoding.INSTANCE);
+        final RubyString str = RubyString.newStringLight(context.runtime, DEFAULT_INSPECT_STR_SIZE, USASCIIEncoding.INSTANCE);
         str.cat((byte)'{');
         final boolean[] firstEntry = new boolean[1];
 
@@ -963,31 +961,10 @@ public class RubyHash extends RubyObject implements Map {
         }
     }
 
-    public final void fastASetCheckString19(Ruby runtime, IRubyObject key, IRubyObject value) {
-      if (key.getMetaClass().getRealClass() == runtime.getString()) {
-          op_asetForString(runtime, (RubyString) key, value);
-      } else {
-          internalPut(key, value);
-      }
-    }
-
-    public final void fastASetSmallCheckString19(Ruby runtime, IRubyObject key, IRubyObject value) {
-        if (key.getMetaClass().getRealClass() == runtime.getString()) {
-            op_asetSmallForString(runtime, (RubyString) key, value);
-        } else {
-            internalPutSmall(key, value);
-        }
-    }
-
-    @Deprecated
-    public IRubyObject op_aset(IRubyObject key, IRubyObject value) {
-        return op_aset(getRuntime().getCurrentContext(), key, value);
-    }
-
     /** rb_hash_aset
      *
      */
-    @JRubyMethod(name = {"[]=", "store"}, required = 2, compat = RUBY1_8)
+    @JRubyMethod(name = {"[]=", "store"})
     public IRubyObject op_aset(ThreadContext context, IRubyObject key, IRubyObject value) {
         modify();
 
@@ -995,13 +972,6 @@ public class RubyHash extends RubyObject implements Map {
         return value;
     }
 
-    @JRubyMethod(name = {"[]=", "store"}, required = 2, compat = RUBY1_9)
-    public IRubyObject op_aset19(ThreadContext context, IRubyObject key, IRubyObject value) {
-        modify();
-
-        fastASetCheckString19(context.runtime, key, value);
-        return value;
-    }
 
     protected void op_asetForString(Ruby runtime, RubyString key, IRubyObject value) {
         final RubyHashEntry entry = internalGetEntry(key);
@@ -1029,22 +999,6 @@ public class RubyHash extends RubyObject implements Map {
             }
             internalPutSmall(key, value, false);
         }
-    }
-
-    /**
-     * Note: this is included as a compatibility measure for AR-JDBC
-     * @deprecated use RubyHash.op_aset instead
-     */
-    public IRubyObject aset(IRubyObject key, IRubyObject value) {
-        return op_aset(getRuntime().getCurrentContext(), key, value);
-    }
-
-    /**
-     * Note: this is included as a compatibility measure for Mongrel+JRuby
-     * @deprecated use RubyHash.op_aref instead
-     */
-    public IRubyObject aref(IRubyObject key) {
-        return op_aref(getRuntime().getCurrentContext(), key);
     }
 
     public final IRubyObject fastARef(IRubyObject key) { // retuns null when not found to avoid unnecessary getRuntime().getNil() call
@@ -1174,17 +1128,19 @@ public class RubyHash extends RubyObject implements Map {
     /** rb_hash_fetch
      *
      */
-    @JRubyMethod(required = 1, optional = 1)
+    @JRubyMethod(required = 1, optional = 1, compat = RUBY1_8)
     public IRubyObject fetch(ThreadContext context, IRubyObject[] args, Block block) {
         Ruby runtime = context.runtime;
 
         if (args.length == 2 && block.isGiven()) {
-            getRuntime().getWarnings().warn(ID.BLOCK_BEATS_DEFAULT_VALUE, "block supersedes default value argument");
+            runtime.getWarnings().warn(ID.BLOCK_BEATS_DEFAULT_VALUE, "block supersedes default value argument");
         }
 
-        IRubyObject value;
-        if ((value = internalGet(args[0])) == null) {
+        IRubyObject value = internalGet(args[0]);
+        
+        if (value == null) {
             if (block.isGiven()) return block.yield(context, args[0]);
+            
             if (args.length == 1) {
                 if (runtime.is1_9()) {
                     throw runtime.newKeyError("key not found: " + args[0]);
@@ -1194,6 +1150,42 @@ public class RubyHash extends RubyObject implements Map {
             }
             return args[1];
         }
+        
+        return value;
+    }
+    
+    @JRubyMethod(compat = RUBY1_9)
+    public IRubyObject fetch(ThreadContext context, IRubyObject key, Block block) {
+        Ruby runtime = context.runtime;
+
+        IRubyObject value = internalGet(key);
+        
+        if (value == null) {
+            if (block.isGiven()) return block.yield(context, key);
+            
+            throw runtime.newKeyError("key not found: " + key);
+        }
+        
+        return value;
+    }
+    
+    @JRubyMethod(compat = RUBY1_9)
+    public IRubyObject fetch(ThreadContext context, IRubyObject key, IRubyObject _default, Block block) {
+        Ruby runtime = context.runtime;
+        boolean blockGiven = block.isGiven();
+
+        if (blockGiven) {
+            runtime.getWarnings().warn(ID.BLOCK_BEATS_DEFAULT_VALUE, "block supersedes default value argument");
+        }
+
+        IRubyObject value = internalGet(key);
+        
+        if (value == null) {
+            if (blockGiven) return block.yield(context, key);
+            
+            return _default;
+        }
+        
         return value;
     }
 
@@ -1207,7 +1199,7 @@ public class RubyHash extends RubyObject implements Map {
 
     private static class Found extends RuntimeException {
         @Override
-        public synchronized Throwable fillInStackTrace() {
+        public Throwable fillInStackTrace() {
             return null;
         }
     }
@@ -1790,7 +1782,7 @@ public class RubyHash extends RubyObject implements Map {
         final RubyHash self = this;
         return replaceCommon19(context, other, new Visitor() {
             public void visit(IRubyObject key, IRubyObject value) {
-                self.op_aset19(context, key, value);
+                self.op_aset(context, key, value);
             }
         });
     }
@@ -2330,5 +2322,44 @@ public class RubyHash extends RubyObject implements Map {
         public int hashCode() {
             return entry.hashCode();
         }
+    }
+    
+    @Deprecated
+    public IRubyObject op_aset19(ThreadContext context, IRubyObject key, IRubyObject value) {
+        modify();
+
+        fastASetCheckString19(context.runtime, key, value);
+        return value;
+    }
+
+    /**
+     * Note: this is included as a compatibility measure for AR-JDBC
+     * @deprecated use RubyHash.op_aset instead
+     */
+    public IRubyObject aset(IRubyObject key, IRubyObject value) {
+        return op_aset(getRuntime().getCurrentContext(), key, value);
+    }
+
+    /**
+     * Note: this is included as a compatibility measure for Mongrel+JRuby
+     * @deprecated use RubyHash.op_aref instead
+     */
+    public IRubyObject aref(IRubyObject key) {
+        return op_aref(getRuntime().getCurrentContext(), key);
+    }
+
+    @Deprecated
+    public final void fastASetCheckString19(Ruby runtime, IRubyObject key, IRubyObject value) {
+        fastASetCheckString(runtime, key, value);
+    }
+
+    @Deprecated
+    public final void fastASetSmallCheckString19(Ruby runtime, IRubyObject key, IRubyObject value) {
+        fastASetSmallCheckString(runtime, key, value);
+    }
+
+    @Deprecated
+    public IRubyObject op_aset(IRubyObject key, IRubyObject value) {
+        return op_aset(getRuntime().getCurrentContext(), key, value);
     }
 }
