@@ -1,0 +1,38 @@
+#-*- mode: ruby -*-
+
+dump_pom( 'pom.xml' )
+
+# lock down versions
+properties['jruby.version'] = '1.7.3'
+properties['jruby.plugins.version'] = '0.29.4'
+
+require './bouncy-castle-version.rb'
+
+build.resources.add do |r|
+  r.directory '../../lib/ruby/shared/'
+  r.target_path '${basedir}/lib'
+  r.includes << 'bouncy-castle-java.rb'
+end
+
+plugin( :dependency, '2.8' ).in_phase( 'prepare-package', 'copy bouncy castle jars' )
+  .execute_goal( 'copy' )
+  .with( :artifactItems => [ { :groupId => 'org.bouncycastle',
+                               :artifactId => 'bcpkix-jdk15on',
+                               :version => BouncyCastle::MAVEN_VERSION,
+                               :type => :jar,
+                               :overWrite => false,
+                               :outputDirectory => '${basedir}/lib' },
+                             { :groupId => 'org.bouncycastle',
+                               :artifactId => 'bcprov-jdk15on',
+                               :version => BouncyCastle::MAVEN_VERSION,
+                               :type => :jar,
+                               :overWrite => false,
+                               :outputDirectory => '${basedir}/lib' }
+ ] )
+
+plugin(:clean, '2.5' )
+  .in_phase( 'clean', 'clean-lib' ).execute_goal( :clean )
+  .with( :filesets => [ { :directory => '${basedir}/lib' } ],
+         :failOnError => false )
+
+# vim: syntax=Ruby
