@@ -39,7 +39,14 @@
   </dependencies>
   
   <build>
+    <finalName>readline</finalName>
     <plugins>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+	<configuration>
+	  <outputDirectory>${readline.dir}</outputDirectory>
+	</configuration>
+      </plugin>
       <plugin>
         <artifactId>maven-clean-plugin</artifactId>
         <configuration>

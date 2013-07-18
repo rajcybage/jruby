@@ -47,7 +47,14 @@
   </dependencies>
   
   <build>
+    <finalName>jopenssl</finalName>
     <plugins>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+	<configuration>
+	  <outputDirectory>${openssl.dir}</outputDirectory>
+	</configuration>
+      </plugin>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>

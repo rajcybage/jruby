@@ -30,11 +30,11 @@
       <version>${project.parent.version}</version>
       <scope>provided</scope>
     </dependency>
+    <!-- TODO really needs to be packed with ripper.jar ?? -->
     <dependency>
       <groupId>org.jruby</groupId>
       <artifactId>jay-yydebug</artifactId>
       <version>1.0</version>
-      <type>jar</type>
     </dependency>
   </dependencies>
   
