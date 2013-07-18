@@ -29,6 +29,12 @@ project 'JRuby OSGI Test' do
   plugin( :compiler, '2.5.1',
           'source' =>  '1.6',
           'target' =>  '1.6' )
+
+  build do
+    output_directory 'target/classes'
+    source 'src/main/java'
+  end
+
   profile 'felix2' do
 
     jar( 'org.apache.felix:org.apache.felix.framework:2.0.5',

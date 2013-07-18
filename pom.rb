@@ -4,6 +4,14 @@ project 'JRuby' do
   id 'org.jruby:jruby-parent:1.7.5.dev'
   packaging 'pom'
 
+  repository( 'file:${basedir}/localrepo',
+              :id => 'localrepo' )
+  repository( 'https://oss.sonatype.org/content/repositories/snapshots/',
+              :id => 'sonatype' ) do
+    releases 'false'
+    snapshots 'true'
+  end
+
   source_code( 'https://github.com/jruby/jruby',
                :connection => 'scm:git:git://github.com/jruby/jruby.git',
                :developer_connection => 'scm:git:ssh://git@github.com/jruby/jruby.git' )
@@ -21,6 +29,7 @@ project 'JRuby' do
               'diff-lcs.version' => '1.1.3',
               'github.global.server' => 'github',
               'main.basedir' => '${project.basedir}',
+              'bc.version' => '1.47',
               'rake.version' => '10.1.0',
               'rdoc.version' => '3.12',
               'rspec.version' => '2.14.1',
@@ -80,6 +89,12 @@ project 'JRuby' do
 
   build do
     default_goal 'package'
+  end
+
+  profile 'gems' do
+
+    modules [ 'gems' ]
+
   end
 
   profile 'docs' do

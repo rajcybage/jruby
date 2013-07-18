@@ -3,7 +3,7 @@ project 'JRuby Main Maven Artifact' do
   model_version '4.0.0'
   id 'org.jruby:jruby:1.7.5.dev'
   inherit 'org.jruby:jruby-artifacts:1.7.5.dev'
-  packaging 'pom'
+  packaging 'jar'
 
   properties( 'jruby.basedir' => '${basedir}/../../',
               'main.basedir' => '${project.parent.parent.basedir}' )

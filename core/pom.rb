@@ -5,14 +5,6 @@ project 'JRuby Core' do
   inherit 'org.jruby:jruby-parent:1.7.5.dev'
   packaging 'jar'
 
-  repository( 'file:${jruby.basedir}/localrepo',
-              :id => 'localrepo' )
-  repository( 'https://oss.sonatype.org/content/repositories/snapshots/',
-              :id => 'sonatype' ) do
-    releases 'false'
-    snapshots 'true'
-  end
-
   source_code( 'http://github.com/jruby/jruby',
                :connection => 'scm:git:git://github.com/jruby/jruby.git',
                :developer_connection => 'scm:git:ssh://git@github.com/jruby/jruby.git' )
@@ -23,7 +15,7 @@ project 'JRuby Core' do
               'main.basedir' => '${project.parent.basedir}',
               'maven.test.skip' => 'true',
               'tzdata.scope' => 'provided',
-              'unsafe.jar' => '${project.build.directory}/unsafe.jar',
+              'unsafe.jar' => '${settings.localRepository}/com/headius/unsafe-mock/8.0/unsafe-mock-8.0.jar',
               'build.date' => '${maven.build.timestamp}',
               'jruby.test.memory.permgen' => '512M',
               'tzdata.version' => '2012j',
@@ -181,13 +173,6 @@ project 'JRuby Core' do
                                    'org/jruby/util/CodegenUtils.java',
                                    'org/jruby/util/SafePropertyAccessor.java' ] )
     execute_goals( 'compile',
-                   :id => 'compile-constants',
-                   :phase => 'process-resources',
-                   'compilerArgs' => [ '-XDignore.symbol.file=true',
-                                       '-J-Duser.language=en',
-                                       '-J-Dfile.encoding=UTF-8' ],
-                   'includes' => [ '${Constants.java}' ] )
-    execute_goals( 'compile',
                    :id => 'default-compile',
                    :phase => 'compile',
                    'annotationProcessors' => [ 'org.jruby.anno.AnnotationBinder' ],
@@ -195,8 +180,7 @@ project 'JRuby Core' do
                                        '-J-Duser.language=en',
                                        '-J-Dfile.encoding=UTF-8',
                                        '-J-Xbootclasspath/p:${unsafe.jar}',
-                                       '-J-Xmx${jruby.compile.memory}' ],
-                   'excludes' => [ '${Constants.java}' ] )
+                                       '-J-Xmx${jruby.compile.memory}' ] )
     execute_goals( 'compile',
                    :id => 'populators',
                    :phase => 'process-classes',
@@ -213,41 +197,12 @@ project 'JRuby Core' do
                    'includes' => [ '**/*.java' ] )
   end
 
-  plugin :dependency do
-    jar 'biz.aQute:bnd:0.0.384'
-
-    execute_goals( 'copy',
-                   :id => 'copy jars',
-                   :phase => 'process-resources',
-                   'artifactItems' => [ { 'groupId' =>  'biz.aQute',
-                                          'artifactId' =>  'bnd',
-                                          'version' =>  '0.0.384',
-                                          'type' =>  'jar',
-                                          'overWrite' =>  'false',
-                                          'outputDirectory' =>  '${project.build.directory}',
-                                          'destFileName' =>  'bnd.jar' },
-                                        { 'groupId' =>  'com.headius',
-                                          'artifactId' =>  'unsafe-mock',
-                                          'version' =>  '8.0',
-                                          'type' =>  'jar',
-                                          'overWrite' =>  'false',
-                                          'outputDirectory' =>  '${project.build.directory}',
-                                          'destFileName' =>  'unsafe.jar' } ] )
-  end
-
   plugin :clean do
     execute_goals( 'clean',
                    :id => 'default-clean',
                    :phase => 'clean',
                    'filesets' => [ { 'directory' =>  '${project.build.sourceDirectory}',
                                      'includes' => [ '${Constants.java}' ] } ],
-                   'failOnError' =>  'false' )
-    execute_goals( 'clean',
-                   :id => 'clean-anno-files',
-                   :phase => 'process-classes',
-                   'excludeDefaultDirectories' =>  'true',
-                   'filesets' => [ { 'directory' =>  '${anno.sources}',
-                                     'includes' => [ 'annotated_classes.txt' ] } ],
                    'failOnError' =>  'false' )
   end
 
@@ -266,25 +221,6 @@ project 'JRuby Core' do
                    'outputFile' =>  '${jruby.basedir}/lib/jruby.jar',
                    'transformers' => [ { '@implementation' =>  'org.apache.maven.plugins.shade.resource.ManifestResourceTransformer',
                                          'mainClass' =>  'org.jruby.Main' } ] )
-  end
-
-  plugin :antrun do
-    execute_goals( 'run',
-                   :id => 'copy',
-                   :phase => 'package',
-                   'tasks' => {
-                     'exec' => {
-                       '@executable' =>  '/bin/sh',
-                       '@osfamily' =>  'unix',
-                       'arg' => {
-                         '@line' =>  '-c \'test -f "${jruby.basedir}/bin/jruby" || cp "${jruby.basedir}/bin/jruby.bash" "${jruby.basedir}/bin/jruby"\''
-                       }
-                     },
-                     'chmod' => {
-                       '@file' =>  '${jruby.basedir}/bin/jruby',
-                       '@perm' =>  '755'
-                     }
-                   } )
   end
 
   plugin( :surefire,
@@ -324,6 +260,33 @@ project 'JRuby Core' do
       target_path '${project.build.sourceDirectory}'
       filtering 'true'
     end
+  end
+
+  profile 'jruby.bash' do
+
+    activation do
+      file( :missing => '../bin/jruby' )
+    end
+
+    plugin :antrun do
+      execute_goals( 'run',
+                     :id => 'copy',
+                     :phase => 'package',
+                     'tasks' => {
+                       'exec' => {
+                         '@executable' =>  '/bin/sh',
+                         '@osfamily' =>  'unix',
+                         'arg' => {
+                           '@line' =>  '-c \'test -f "${jruby.basedir}/bin/jruby" || cp "${jruby.basedir}/bin/jruby.bash" "${jruby.basedir}/bin/jruby"\''
+                         }
+                       },
+                       'chmod' => {
+                         '@file' =>  '${jruby.basedir}/bin/jruby',
+                         '@perm' =>  '755'
+                       }
+                     } )
+    end
+
   end
 
   profile 'native' do

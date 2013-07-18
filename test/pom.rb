@@ -5,15 +5,8 @@ project 'JRuby Integration Tests' do
   inherit 'org.jruby:jruby-parent:1.7.5.dev'
   packaging 'jar'
 
-  repository( 'file:${jruby.basedir}/localrepo',
-              :id => 'localrepo' )
   repository( 'http://rubygems-proxy.torquebox.org/releases',
               :id => 'rubygems-releases' )
-  repository( 'https://oss.sonatype.org/content/repositories/snapshots/',
-              :id => 'sonatype' ) do
-    releases 'false'
-    snapshots 'true'
-  end
 
   plugin_repository( 'https://oss.sonatype.org/content/repositories/snapshots/',
                      :id => 'sonatype' ) do

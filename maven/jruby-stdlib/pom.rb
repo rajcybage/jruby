@@ -15,6 +15,8 @@ project 'JRuby Stdlib' do
        :scope => 'provided' )
   jar( 'org.jruby:openssl:0.8.9-SNAPSHOT',
        :scope => 'provided' )
+  jar 'org.bouncycastle:bcpkix-jdk15on:${bc.version}'
+  jar 'org.bouncycastle:bcprov-jdk15on:${bc.version}'
 
 
   build do
@@ -36,7 +38,7 @@ project 'JRuby Stdlib' do
     resource do
       directory '${jruby.basedir}'
       includes 'lib/ruby/1.8/**', 'lib/ruby/1.9/**', 'lib/ruby/2.0/**', 'lib/ruby/shared/**'
-      excludes 
+      excludes 'lib/**/bc*.jar'
       target_path '${jruby.complete.home}'
     end
   end

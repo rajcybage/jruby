@@ -18,4 +18,10 @@ project 'JRuby Rake Plugin' do
           'excludes' => [ 'none' ] )
   plugin( :jar,
           'excludes' => [ 'none' ] )
+
+  build do
+    output_directory 'target/classes'
+    source 'src/main/java'
+  end
+
 end
