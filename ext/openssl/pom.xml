@@ -14,9 +14,7 @@
   <name>JRuby OpenSSL</name>
 
   <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <openssl.dir>${project.basedir}/../../lib/ruby/shared</openssl.dir>
-    <base.java.version>1.6</base.java.version>
     <main.basedir>${project.parent.parent.basedir}</main.basedir>
   </properties>
 
@@ -24,6 +22,7 @@
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
@@ -90,20 +89,6 @@
                   <outputDirectory>${openssl.dir}</outputDirectory>
                 </artifactItem>
               </artifactItems>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-shade-plugin</artifactId>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <configuration>
-              <outputFile>${openssl.dir}/jopenssl.jar</outputFile>
             </configuration>
           </execution>
         </executions>
