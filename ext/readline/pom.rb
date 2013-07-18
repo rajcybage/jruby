@@ -6,11 +6,10 @@ project 'JRuby Readline' do
   packaging 'jar'
 
   properties( 'readline.dir' => '${project.basedir}/../../lib/ruby/shared/readline',
-              'main.basedir' => '${project.parent.parent.basedir}',
-              'project.build.sourceEncoding' => 'UTF-8',
-              'base.java.version' => '1.6' )
+              'main.basedir' => '${project.parent.parent.basedir}' )
 
-  jar 'junit:junit'
+  jar( 'junit:junit',
+       :scope => 'test' )
   jar( 'org.jruby:jruby-core:${project.parent.version}',
        :scope => 'provided' )
   jar( 'jline:jline:2.11',
@@ -54,12 +53,6 @@ project 'JRuby Readline' do
                                           'type' =>  'jar',
                                           'overWrite' =>  'false',
                                           'outputDirectory' =>  '${readline.dir}' } ] )
-  end
-
-  plugin :shade do
-    execute_goals( 'shade',
-                   :phase => 'package',
-                   'outputFile' =>  '${readline.dir}/readline.jar' )
   end
 
 end

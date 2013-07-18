@@ -6,12 +6,10 @@ project 'JRuby OpenSSL' do
   packaging 'jar'
 
   properties( 'main.basedir' => '${project.parent.parent.basedir}',
-              'bc.version' => '1.47',
-              'project.build.sourceEncoding' => 'UTF-8',
-              'openssl.dir' => '${project.basedir}/../../lib/ruby/shared',
-              'base.java.version' => '1.6' )
+              'openssl.dir' => '${project.basedir}/../../lib/ruby/shared' )
 
-  jar 'junit:junit'
+  jar( 'junit:junit',
+       :scope => 'test' )
   jar( 'org.bouncycastle:bcpkix-jdk15on:${bc.version}',
        :scope => 'provided' )
   jar( 'org.bouncycastle:bcprov-jdk15on:${bc.version}',
@@ -44,12 +42,6 @@ project 'JRuby OpenSSL' do
                                           'type' =>  'jar',
                                           'overWrite' =>  'false',
                                           'outputDirectory' =>  '${openssl.dir}' } ] )
-  end
-
-  plugin :shade do
-    execute_goals( 'shade',
-                   :phase => 'package',
-                   'outputFile' =>  '${openssl.dir}/jopenssl.jar' )
   end
 
   plugin( :clean,

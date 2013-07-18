@@ -5,20 +5,10 @@ project 'JRuby Ripper' do
   inherit 'org.jruby:jruby-ext:1.7.5.dev'
   packaging 'jar'
 
-  repository( 'file:${jruby.basedir}/localrepo',
-              :id => 'localrepo' )
-  repository( 'https://oss.sonatype.org/content/repositories/snapshots/',
-              :id => 'sonatype' ) do
-    releases 'false'
-    snapshots 'true'
-  end
-
   properties( 'shared.dir' => '${project.basedir}/../../lib/ruby/shared',
-              'main.basedir' => '${project.parent.parent.basedir}',
-              'project.build.sourceEncoding' => 'UTF-8',
-              'base.java.version' => '1.6' )
+              'main.basedir' => '${project.parent.parent.basedir}' )
 
-  jar( 'junit:junit:3.8.1',
+  jar( 'junit:junit',
        :scope => 'test' )
   jar( 'org.jruby:jruby-core:${project.parent.version}',
        :scope => 'provided' )
