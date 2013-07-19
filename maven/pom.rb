@@ -12,7 +12,6 @@ project 'JRuby Artifacts' do
             'jruby-complete',
             'jruby-rake-plugin',
             'jruby-dist',
-            'joda-timezones',
             'jruby-osgi-test' ]
 
   end

@@ -32,7 +32,7 @@ project 'JRuby OSGI Test' do
 
   build do
     output_directory 'target/classes'
-    source 'src/main/java'
+    source_directory 'src/main/java'
   end
 
   profile 'felix2' do

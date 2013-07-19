@@ -30,6 +30,8 @@ project 'JRuby Readline' do
             } )
   end
 
+  plugin( :jar,
+          'outputDirectory' =>  '${readline.dir}' )
   plugin( :clean,
           'filesets' => [ { 'directory' =>  '${readline.dir}',
                             'includes' => [ 'jline-*.jar',
@@ -53,6 +55,11 @@ project 'JRuby Readline' do
                                           'type' =>  'jar',
                                           'overWrite' =>  'false',
                                           'outputDirectory' =>  '${readline.dir}' } ] )
+  end
+
+
+  build do
+    final_name 'readline'
   end
 
 end

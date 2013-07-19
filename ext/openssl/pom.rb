@@ -17,6 +17,8 @@ project 'JRuby OpenSSL' do
   jar( 'org.jruby:jruby-core:${project.parent.version}',
        :scope => 'provided' )
 
+  plugin( :jar,
+          'outputDirectory' =>  '${openssl.dir}' )
   plugin( :compiler,
           'encoding' =>  'utf-8',
           'debug' =>  'true',
@@ -48,4 +50,9 @@ project 'JRuby OpenSSL' do
           'filesets' => [ { 'directory' =>  '${openssl.dir}',
                             'includes' => [ 'bc*-jdk15on-*.jar',
                                             'jopenssl.jar' ] } ] )
+
+  build do
+    final_name 'jopenssl'
+  end
+
 end

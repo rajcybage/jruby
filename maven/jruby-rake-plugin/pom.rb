@@ -21,7 +21,7 @@ project 'JRuby Rake Plugin' do
 
   build do
     output_directory 'target/classes'
-    source 'src/main/java'
+    source_directory 'src/main/java'
   end
 
 end
