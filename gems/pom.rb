@@ -5,6 +5,9 @@ project 'JRuby Gems' do
   inherit 'org.jruby:jruby-parent:1.7.5.dev'
   packaging 'pom'
 
-  modules [ 'bouncy-castle-java' ]
+  modules [ 'bouncy-castle-java', 
+            'jruby-core-complete',
+            'jruby-stdlib-complete',
+            'jruby-jars' ]
 
 end

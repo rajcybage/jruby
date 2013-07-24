@@ -1,13 +1,11 @@
-require File.join(File.expand_path(File.dirname(__FILE__)), 'jruby-jars/version.rb')
-
 module JRubyJars
   PATH = File.expand_path(File.dirname(__FILE__))
 
   def self.core_jar_path
-    PATH + "/jruby-core-#{VERSION}.jar"
+    Dir[ PATH + "/jruby-core-complete-*.jar" ].first
   end
 
   def self.stdlib_jar_path
-    PATH + "/jruby-stdlib-#{VERSION}.jar"
+    Dir[ PATH + "/jruby-stdlib-complete-*.jar" ].first
   end
 end

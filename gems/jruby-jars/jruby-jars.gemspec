@@ -1,10 +1,8 @@
 require 'rake'
-JRUBY_SRC_VERSION = IO.readlines("../../default.build.properties").detect {|l| l =~ /^version\.jruby=(.*)/} && $1
 
 Gem::Specification.new do |s|
   s.name = 'jruby-jars'
-  s.version = JRUBY_SRC_VERSION # .downcase
-  s.date = Date.today.strftime '%Y-%m-%d'
+  s.version = '1.7.5.dev'
   s.authors = ['Charles Oliver Nutter']
   s.email = "headius@headius.com"
   s.summary = "The core JRuby code and the JRuby stdlib as jar files."
