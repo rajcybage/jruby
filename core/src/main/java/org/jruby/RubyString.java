@@ -74,7 +74,6 @@ import org.jruby.util.SipHashInline;
 import org.jruby.util.Sprintf;
 import org.jruby.util.StringSupport;
 import org.jruby.util.TypeConverter;
-import org.jruby.util.XMLConverter;
 import org.jruby.util.string.JavaCrypt;
 
 import java.io.UnsupportedEncodingException;
@@ -604,6 +603,10 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         return newStringShared(runtime, new ByteList(bytes, false));
     }
 
+    public static RubyString newStringShared(Ruby runtime, byte[] bytes, Encoding encoding) {
+        return newStringShared(runtime, new ByteList(bytes, encoding, false));
+    }
+
     public static RubyString newStringShared(Ruby runtime, byte[] bytes, int start, int length) {
         return newStringShared(runtime, new ByteList(bytes, start, length, false));
     }
@@ -740,34 +743,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
      * @return A decoded Java String, based on this Ruby string's encoding.
      */
     public String decodeString() {
-        Ruby runtime = getRuntime();
-        // Note: we always choose UTF-8 for outbound strings in 1.8 mode.  This is clearly undesirable
-        // but we do not mark any incoming Strings from JI with their real encoding so we just pick utf-8.
-        
-        if (runtime.is1_9()) {
-            Encoding encoding = getEncoding();
-            
-            if (encoding == UTF8) {
-                // faster UTF8 decoding
-                return RubyEncoding.decodeUTF8(value.getUnsafeBytes(), value.begin(), value.length());
-            }
-            
-            Charset charset = runtime.getEncodingService().charsetForEncoding(encoding);
-
-            // charset is not defined for this encoding in jcodings db.  Try letting Java resolve this.
-            if (charset == null) {
-                try {
-                    return new String(value.getUnsafeBytes(), value.begin(), value.length(), encoding.toString());
-                } catch (UnsupportedEncodingException uee) {
-                    return value.toString();
-                }
-            }
-            
-            return RubyEncoding.decode(value.getUnsafeBytes(), value.begin(), value.length(), charset);
-        } else {
-            // fast UTF8 decoding
-            return RubyEncoding.decodeUTF8(value.getUnsafeBytes(), value.begin(), value.length());
-        }
+        return Helpers.decodeByteList(getRuntime(), value);
     }
 
     /**
@@ -7683,12 +7659,6 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
         }
         
         ByteList output = CharsetTranscoder.transcode(context, value, fromEncoding, toEncoding, opts, is7BitASCII);
-        
-        boolean xmlConversion = false;
-        xmlConversion = !opts.isNil() && ((RubyHash)opts).fastARef(context.runtime.newSymbol("xml")) != null;
-        if (xmlConversion) {
-            output = XMLConverter.convert(context, output, opts);
-        }
         
         return output;
     }

@@ -1,5 +1,7 @@
 package org.jruby.runtime;
 
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import org.jruby.*;
 import org.jruby.ast.ArgsNode;
 import org.jruby.ast.ArgumentNode;
@@ -42,6 +44,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
+import org.jcodings.Encoding;
+import org.jcodings.specific.ASCIIEncoding;
+import org.jcodings.specific.USASCIIEncoding;
+import org.jcodings.specific.UTF8Encoding;
+import org.jcodings.unicode.UnicodeEncoding;
 
 import static org.jruby.runtime.invokedynamic.MethodNames.EQL;
 import static org.jruby.runtime.invokedynamic.MethodNames.OP_EQUAL;
@@ -2888,6 +2895,47 @@ public class Helpers {
         }
     }
 
+    public static IRubyObject irNot(ThreadContext context, IRubyObject obj) {
+        return context.runtime.newBoolean(!(obj.isTrue()));
+    }
+
+    public static IRubyObject irLoadOptArg(int minReqd, int argIndex, IRubyObject[] args) {
+        // FIXME: Missing kwargs 2.0 support (kwArgHashCount value)
+        int kwArgHashCount = 0;
+        if (minReqd + kwArgHashCount < args.length) {
+            return args[argIndex];
+        } else {
+            return UndefinedValue.UNDEFINED;
+        }
+    }
+
+    public static IRubyObject irPostReqdArg(int argIndex, int preReqdArgsCount, int postReqdArgsCount, IRubyObject[] args) {
+        // FIXME: Missing kwargs 2.0 support (kwArgHashCount value)
+        int kwArgHashCount = 0;
+        int n = args.length;
+        int remaining = n - preReqdArgsCount - kwArgHashCount;
+        if (remaining <= argIndex) {
+            return null;  // For blocks!
+        } else {
+            return (remaining > postReqdArgsCount) ? args[n - postReqdArgsCount - kwArgHashCount + argIndex] : args[preReqdArgsCount + argIndex];
+        }
+    }
+
+    private static IRubyObject[] NO_PARAMS = new IRubyObject[0];
+    public static IRubyObject irLoadRestArg(ThreadContext context, int minReqd, int argIndex, IRubyObject[] args) {
+        // FIXME: Missing kwargs 2.0 support (kwArgHashCount value)
+        int kwArgHashCount = 0;
+        IRubyObject[] ret;
+        int numAvailable = args.length - minReqd - kwArgHashCount;
+        if (numAvailable <= 0) {
+            ret = NO_PARAMS;
+        } else {
+            ret = new IRubyObject[numAvailable];
+            System.arraycopy(args, argIndex, ret, 0, numAvailable);
+        }
+        return context.getRuntime().newArray(ret);
+    }
+
     @Deprecated
     public static IRubyObject invokedynamic(ThreadContext context, IRubyObject self, int index) {
         return invokedynamic(context, self, MethodNames.values()[index]);
@@ -2904,5 +2952,82 @@ public class Helpers {
     
     private static <T extends Throwable> void throwsUnchecked(Throwable t) throws T {
         throw (T)t;
+    }
+    
+    /**
+     * Decode the given value to a Java string using the following rules:
+     * 
+     * * If the string is all US-ASCII characters, it will be decoded as US-ASCII.
+     * * If the string is a unicode encoding, it will be decoded as such.
+     * * If the string is any other encoding, it will be encoded as raw bytes
+     *   using ISO-8859-1.
+     * 
+     * This allows non-unicode, non-US-ASCII encodings to be represented in the
+     * symbol table as their raw versions, but properly decodes unicode-
+     * encoded strings.
+     * 
+     * @param value the value to decode
+     * @return the resulting symbol string
+     */
+    public static String symbolBytesToString(ByteList value) {
+        Encoding encoding = value.getEncoding();
+        if (encoding == USASCIIEncoding.INSTANCE || encoding == ASCIIEncoding.INSTANCE) {
+            return value.toString(); // raw
+        } else if (encoding instanceof UnicodeEncoding) {
+            return new String(value.getUnsafeBytes(), value.getBegin(), value.getRealSize(), value.getEncoding().getCharset());
+        } else {
+            return value.toString(); // raw
+        }
+    }
+
+    /**
+     * Decode a given ByteList to a Java string.
+     *
+     * @param runtime the current runtime
+     * @param value the bytelist
+     * @return a Java String representation of the ByteList
+     */
+    public static String decodeByteList(Ruby runtime, ByteList value) {
+        byte[] unsafeBytes = value.getUnsafeBytes();
+        int begin = value.getBegin();
+        int length = value.length();
+        
+        if (runtime.is1_9()) {
+            Encoding encoding = value.getEncoding();
+            
+            if (encoding == UTF8Encoding.INSTANCE) {
+                return RubyEncoding.decodeUTF8(unsafeBytes, begin, length);
+            }
+            
+            Charset charset = runtime.getEncodingService().charsetForEncoding(encoding);
+            
+            if (charset == null) {
+                try {
+                    return new String(unsafeBytes, begin, length, encoding.toString());
+                } catch (UnsupportedEncodingException uee) {
+                    return value.toString();
+                }
+            }
+            
+            return RubyEncoding.decode(unsafeBytes, begin, length, charset);
+            
+        } else {
+            return RubyEncoding.decodeUTF8(unsafeBytes, begin, length);
+        }
+    }
+    
+    /**
+     * Convert a ByteList into a Java String by using its Encoding's Charset. If
+     * the Charset is not available, fall back on other logic.
+     * 
+     * @param byteList the bytelist to decode
+     * @return the decoded string
+     */
+    public static String byteListToString(ByteList byteList) {
+        if (byteList.getEncoding().getCharset() != null) {
+            return new String(byteList.getUnsafeBytes(), byteList.getBegin(), byteList.getRealSize(), byteList.getEncoding().getCharset());
+        }
+        
+        return byteList.toString();
     }
 }

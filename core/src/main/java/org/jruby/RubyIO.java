@@ -103,7 +103,6 @@ import org.jruby.runtime.Arity;
 import static org.jruby.CompatVersion.*;
 import static org.jruby.RubyEnumerator.enumeratorize;
 import org.jruby.internal.runtime.ThreadedRunnable;
-import org.jruby.internal.runtime.methods.JavaMethod;
 import org.jruby.runtime.encoding.EncodingService;
 import org.jruby.util.CharsetTranscoder;
 import org.jruby.util.ShellLauncher.POpenProcess;
@@ -5079,7 +5078,7 @@ public class RubyIO extends RubyObject implements IOEncodable {
      */
     protected Encoding readEncoding; // MRI:enc
     protected Encoding writeEncoding; // MRI:enc2
-    protected CharsetTranscoder.CodingErrorActions transcodingActions;
+    protected CharsetTranscoder.CodingActions transcodingActions;
     
     /**
      * If the stream is being used for popen, we don't want to destroy the process
